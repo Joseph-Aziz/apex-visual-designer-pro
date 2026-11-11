@@ -30,7 +30,7 @@ END PKG_VD_PLUGIN;
 CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
   -- Release of the editor files; it ends up in the iframe URL as ?v=, with the plug-in's file
   -- prefix (which APEX versions itself) in front of it.
-  c_version CONSTANT VARCHAR2(20) := '1.0.1';
+  c_version CONSTANT VARCHAR2(20) := '1.0.2';
 
   -- A region attribute. APEX 26.2 keeps them in p_region.attributes; the classic
   -- attribute_NN fields stay empty for regions created or edited in 26.2.
@@ -68,6 +68,22 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
       apex_escape.html_attribute(apex_plugin.get_ajax_identifier) || chr(38) || 'app=' || l_app || '"></iframe>');
   END render;
 
+  -- TRUE when the host application and p_app share one APEX session: both current
+  -- authentication schemes use the same session cookie (Workspace Sharing or a custom name).
+  FUNCTION shares_session(p_app IN NUMBER) RETURN BOOLEAN IS
+    l_n PLS_INTEGER;
+  BEGIN
+    SELECT COUNT(*) INTO l_n
+      FROM apex_application_auth h
+      JOIN apex_application_auth t ON t.cookie_name = h.cookie_name
+     WHERE h.application_id = apex_application.g_flow_id AND h.is_current_authentication = 'Y'
+       AND t.application_id = p_app AND t.is_current_authentication = 'Y'
+       AND h.cookie_name IS NOT NULL;
+    RETURN l_n > 0;
+  EXCEPTION
+    WHEN OTHERS THEN RETURN FALSE;
+  END shares_session;
+
   PROCEDURE do_components IS
   l_app  NUMBER;
     l_page NUMBER;
@@ -83,6 +99,7 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
 
     apex_json.open_object;
     apex_json.write('success', TRUE);
+    apex_json.write('sharedSession', shares_session(l_app));
     apex_json.open_array('regions');
     FOR r IN (
       SELECT r.region_css_classes, r.region_id, r.static_id, r.region_name, COALESCE(r.source_type_plugin_name, r.source_type_code) source_type_code, p.static_id parent_static_id, r.display_sequence

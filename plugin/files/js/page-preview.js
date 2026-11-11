@@ -5,13 +5,13 @@
   // URL of an APEX page in the host app's session. The editor is served from static
   // files, so the URL is built from the host page's ORDS base
   // (".../ords/r/<workspace>/<app>/..." gives "/ords").
-  function url(appId, pageId) {
-    // Only the host app's own pages get its session. Another app has its own session and
-    // login; handing it the host's session id ends the host session.
+  function url(appId, pageId, sharedSession) {
+    // The host session goes only to the host app's own pages, or to another app that shares
+    // it (both use Workspace Sharing). Otherwise the other app ends the host session.
     var session = '';
     try {
       var env = (window.parent.apex && window.parent.apex.env) || {};
-      if (String(env.APP_ID) === String(appId)) session = env.APP_SESSION || '';
+      if (sharedSession || String(env.APP_ID) === String(appId)) session = env.APP_SESSION || '';
     } catch (e) { session = ''; }
     var base = '/ords';
     try {

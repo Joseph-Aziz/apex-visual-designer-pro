@@ -97,6 +97,7 @@
     return Promise.all([VD.repository.listPageComponents(app, page), VD.repository.readFlutter(app, page), theme])
       .then(function (r) {
         state.components = flatten(r[0]);
+        state.sharedSession = !!r[0].sharedSession;
         state.token = r[1].token;
         state.pageCss = r[1].css || '';
         state.pageJs = r[1].js || '';
@@ -170,7 +171,7 @@
     frame = document.createElement('iframe');
     frame.className = 'lk-frame';
     frame.title = 'Page preview';
-    frame.src = VD.pagePreview.url(state.app, state.page);
+    frame.src = VD.pagePreview.url(state.app, state.page, state.sharedSession);
     frame.addEventListener('load', function () {
       var d = VD.pagePreview.doc(frame);
       if (!d) { setMessage('The page cannot be shown here. Check that the app allows framing from the same origin.'); return; }

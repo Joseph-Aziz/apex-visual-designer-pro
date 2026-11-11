@@ -11,4 +11,6 @@ const url = window.VD.pagePreview.url;
 assert.strictEqual(url(147, 1), '/ords/f?p=147:1:111', 'same app keeps the session');
 assert.strictEqual(url('147', 2), '/ords/f?p=147:2:111', 'same app as a string keeps the session');
 assert.strictEqual(url(100, 4), '/ords/f?p=100:4', 'another app gets no session id');
-console.log('page_preview_test: 3 passed');
+assert.strictEqual(url(100, 4, true), '/ords/f?p=100:4:111', 'another app that shares the session gets it');
+assert.strictEqual(url(100, 4, false), '/ords/f?p=100:4', 'not shared: no session id');
+console.log('page_preview_test: 5 passed');

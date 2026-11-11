@@ -10,7 +10,7 @@ const ROOT = path.join(__dirname, '..');
 const FILES = path.join(ROOT, 'plugin', 'files');
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf('--' + name); return i >= 0 ? args[i + 1] : def; };
-const VERSION = opt('version', '1.0.1');
+const VERSION = opt('version', '1.0.2');
 const OUT = opt('out', path.join(ROOT, 'plugin', 'region_type_plugin_apex_visual_designer.sql'));
 const NAME = 'COM.APEXVD.VISUAL_DESIGNER';
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 - 2026-11-11
+
+- **Preview of other applications:** when the host application and the designed application share one session (Session Sharing set to Workspace Sharing in both authentication schemes), the live preview opens the other application's page in that session.
+
 ## 1.0.1 - 2026-11-11
 
 - **Fix:** opening a page of another application in the designer no longer ends the host application session. The live preview now passes the session id only for the host application's own pages.
