@@ -48,8 +48,8 @@ DECLARE
   -- timestamps, so the test compares what they hold).
   FUNCTION others_hash RETURN NUMBER IS n NUMBER;
   BEGIN
-    SELECT SUM(ORA_HASH(REGION_ID || '|' || REGION_NAME || '|' || TEMPLATE || '|' || DISPLAY_SEQUENCE || '|' || DISPLAY_POSITION || '|' ||
-                        REGION_CSS_CLASSES || '|' || DBMS_LOB.GETLENGTH(REGION_SOURCE) || '|' || DBMS_LOB.SUBSTR(REGION_SOURCE, 3000, 1)))
+    SELECT NVL(SUM(ORA_HASH(REGION_ID || '|' || REGION_NAME || '|' || TEMPLATE || '|' || DISPLAY_SEQUENCE || '|' || DISPLAY_POSITION || '|' ||
+                        REGION_CSS_CLASSES || '|' || DBMS_LOB.GETLENGTH(REGION_SOURCE) || '|' || DBMS_LOB.SUBSTR(REGION_SOURCE, 3000, 1))), 0)
       INTO n FROM APEX_APPLICATION_PAGE_REGIONS
      WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = 0 AND NVL(STATIC_ID, '-') <> 'vd-theme-link';
     RETURN n;

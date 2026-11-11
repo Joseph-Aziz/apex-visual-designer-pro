@@ -1,16 +1,8 @@
 -- APEX Visual Designer - PKG_VD_DESIGN_API (target application check)
 -- Installed by database/install.sql into the schema &&VD_SCHEMA.
 
-CREATE OR REPLACE
---
--- The Flutter Designer (PKG_VD_PAGE_CODE and the page 19 processes) only works
--- on applications registered as active targets in VD_TARGET_APPLICATIONS for the
--- current APEX workspace. The old design repository API that used to live in
--- this package was removed with the old designer screens on 2026-11-11.
--- =============================================================================
-
-SET SERVEROUTPUT ON
-SET DEFINE OFF
+-- The designers only work on applications registered as active targets in
+-- VD_TARGET_APPLICATIONS for the current APEX workspace.
 
 CREATE OR REPLACE PACKAGE &&VD_SCHEMA..PKG_VD_DESIGN_API AUTHID DEFINER AS
   -- Raises ORA-20215 unless p_app_id is an active target of the current workspace.

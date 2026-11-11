@@ -17,6 +17,8 @@ DECLARE
   l_fail PLS_INTEGER := 0;
   l_css CLOB; l_js CLOB; l_tok VARCHAR2(100); l_n NUMBER; l_id NUMBER; l_d CLOB;
   l_orig_css CLOB; l_orig_js CLOB; l_start NUMBER; l_had NUMBER;
+  -- The scratch page needs at least one region, one button and one item; the tests use the first of each.
+  l_region NUMBER; l_item VARCHAR2(255);
 
   -- Versions with this note added by this run (read through the package API).
   FUNCTION cnt(p_note VARCHAR2) RETURN NUMBER IS
@@ -49,6 +51,8 @@ DECLARE
     RETURN TO_CHAR(&&VD_SCHEMA..PKG_VD_PAGE_CODE.merge_block(p_existing, p_block));
   END;
 BEGIN
+  SELECT MIN(REGION_ID) INTO l_region FROM APEX_APPLICATION_PAGE_REGIONS WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE;
+  SELECT MIN(ITEM_NAME) INTO l_item FROM APEX_APPLICATION_PAGE_ITEMS WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE;
   -- merge_block mirrors js/flutter-codegen.js merge()
   ok('merge appends when no markers', m('a{}', 'X') = 'a{}' || nl || c || nl || 'X' || nl || e);
   ok('merge into empty text', m(NULL, 'X') = c || nl || 'X' || nl || e);
@@ -90,7 +94,7 @@ BEGIN
 
   l_tok := &&VD_SCHEMA..PKG_VD_PAGE_CODE.code_token(l_orig_css, l_orig_js);
   l_tok := &&VD_SCHEMA..PKG_VD_PAGE_WRITER.save_design(&&TEST_APP, &&SCRATCH_PAGE, l_tok, '{"components":[]}',
-             'body #P9990_X_CONTAINER input { border-radius: 12px; }' || nl || '/' || nl || 'x{}', 'window.vdSaved = 1;');
+             'body #' || l_item || '_CONTAINER input { border-radius: 12px; }' || nl || '/' || nl || 'x{}', 'window.vdSaved = 1;');
   &&VD_SCHEMA..PKG_VD_PAGE_WRITER.read_code(&&TEST_APP, &&SCRATCH_PAGE, l_css, l_js);
   ok('save keeps existing css before the block', l_css LIKE 'p{color:red}' || nl || c || '%');
   ok('save survives a line with only a slash', INSTR(l_css, nl || '/' || nl || 'x{}') > 0);
@@ -118,20 +122,20 @@ BEGIN
      'declare t varchar2(100); begin t := &&VD_SCHEMA..PKG_VD_PAGE_WRITER.restore_version(&&TEST_APP, &&SCRATCH_PAGE, ''' || l_tok || ''', -1); end;');
 
   -- page components survive saves
-  SELECT COUNT(*) INTO l_n FROM APEX_APPLICATION_PAGE_ITEMS WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE AND ITEM_NAME = 'P9990_X';
+  SELECT COUNT(*) INTO l_n FROM APEX_APPLICATION_PAGE_ITEMS WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE AND ITEM_NAME = l_item;
   ok('item survives saves', l_n = 1);
-  SELECT COUNT(*) INTO l_n FROM APEX_APPLICATION_PAGE_REGIONS WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE AND REGION_ID = 23041497578833297;
+  SELECT COUNT(*) INTO l_n FROM APEX_APPLICATION_PAGE_REGIONS WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE AND REGION_ID = l_region;
   ok('region id stays the same', l_n = 1);
 
   -- set_static_id gives a region or button a Static ID and leaves the page code alone
   &&VD_SCHEMA..PKG_VD_PAGE_WRITER.read_code(&&TEST_APP, &&SCRATCH_PAGE, l_orig_css, l_orig_js);
-  &&VD_SCHEMA..PKG_VD_PAGE_WRITER.set_static_id(&&TEST_APP, &&SCRATCH_PAGE, 'region', 23041497578833297, 'vd_test_region');
+  &&VD_SCHEMA..PKG_VD_PAGE_WRITER.set_static_id(&&TEST_APP, &&SCRATCH_PAGE, 'region', l_region, 'vd_test_region');
   SELECT COUNT(*) INTO l_n FROM APEX_APPLICATION_PAGE_REGIONS
-   WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE AND REGION_ID = 23041497578833297 AND STATIC_ID = 'vd_test_region';
+   WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE AND REGION_ID = l_region AND STATIC_ID = 'vd_test_region';
   ok('region gets the static id', l_n = 1);
-  &&VD_SCHEMA..PKG_VD_PAGE_WRITER.set_static_id(&&TEST_APP, &&SCRATCH_PAGE, 'region', 23041497578833297, 'vd_test_region2');
+  &&VD_SCHEMA..PKG_VD_PAGE_WRITER.set_static_id(&&TEST_APP, &&SCRATCH_PAGE, 'region', l_region, 'vd_test_region2');
   SELECT COUNT(*) INTO l_n FROM APEX_APPLICATION_PAGE_REGIONS
-   WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE AND REGION_ID = 23041497578833297 AND STATIC_ID = 'vd_test_region2';
+   WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE AND REGION_ID = l_region AND STATIC_ID = 'vd_test_region2';
   ok('static id can be changed', l_n = 1);
   SELECT MIN(BUTTON_ID) INTO l_id FROM APEX_APPLICATION_PAGE_BUTTONS WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE;
   &&VD_SCHEMA..PKG_VD_PAGE_WRITER.set_static_id(&&TEST_APP, &&SCRATCH_PAGE, 'button', l_id, 'vd_test_btn');
@@ -140,14 +144,14 @@ BEGIN
   ok('button gets the static id', l_n = 1);
   &&VD_SCHEMA..PKG_VD_PAGE_WRITER.read_code(&&TEST_APP, &&SCRATCH_PAGE, l_css, l_js);
   ok('static id leaves page code alone', NVL(l_css, 'x') = NVL(l_orig_css, 'x') AND NVL(l_js, 'x') = NVL(l_orig_js, 'x'));
-  SELECT COUNT(*) INTO l_n FROM APEX_APPLICATION_PAGE_ITEMS WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE AND ITEM_NAME = 'P9990_X';
+  SELECT COUNT(*) INTO l_n FROM APEX_APPLICATION_PAGE_ITEMS WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE AND ITEM_NAME = l_item;
   ok('item survives static id writes', l_n = 1);
   raises('static id must be a valid name', -20236,
-     'begin &&VD_SCHEMA..PKG_VD_PAGE_WRITER.set_static_id(&&TEST_APP, &&SCRATCH_PAGE, ''region'', 23041497578833297, ''1 bad"id''); end;');
+     'begin &&VD_SCHEMA..PKG_VD_PAGE_WRITER.set_static_id(&&TEST_APP, &&SCRATCH_PAGE, ''region'', ' || l_region || ', ''1 bad"id''); end;');
   raises('static id must be unique on the page', -20237,
-     'begin &&VD_SCHEMA..PKG_VD_PAGE_WRITER.set_static_id(&&TEST_APP, &&SCRATCH_PAGE, ''region'', 23041497578833297, ''vd_test_btn''); end;');
+     'begin &&VD_SCHEMA..PKG_VD_PAGE_WRITER.set_static_id(&&TEST_APP, &&SCRATCH_PAGE, ''region'', ' || l_region || ', ''vd_test_btn''); end;');
   raises('static id cannot reuse an item name', -20237,
-     'begin &&VD_SCHEMA..PKG_VD_PAGE_WRITER.set_static_id(&&TEST_APP, &&SCRATCH_PAGE, ''region'', 23041497578833297, ''P9990_X''); end;');
+     'begin &&VD_SCHEMA..PKG_VD_PAGE_WRITER.set_static_id(&&TEST_APP, &&SCRATCH_PAGE, ''region'', ' || l_region || ', ''' || l_item || '''); end;');
   raises('static id needs a component of the page', -20238,
      'begin &&VD_SCHEMA..PKG_VD_PAGE_WRITER.set_static_id(&&TEST_APP, &&SCRATCH_PAGE, ''region'', -1, ''vd_x''); end;');
   raises('static id needs a known kind', -20238,

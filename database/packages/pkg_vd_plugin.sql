@@ -23,6 +23,10 @@ END PKG_VD_PLUGIN;
 /
 
 CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
+  -- Release of the editor files; it ends up in the iframe URL as ?v=, with the plug-in's file
+  -- prefix (which APEX versions itself) in front of it.
+  c_version CONSTANT VARCHAR2(20) := '1.0.0';
+
   FUNCTION allowed(p_scheme IN VARCHAR2) RETURN BOOLEAN IS
     l_n NUMBER;
   BEGIN
@@ -48,7 +52,7 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
     END IF;
     sys.htp.p('<iframe class="vd-designer" title="APEX Visual Designer" style="display:block;width:100%;height:' ||
       l_height || 'px;border:0" src="' || p_plugin.file_prefix || 'index.html?v=' ||
-      apex_escape.html_attribute(p_plugin.version) || chr(38) || 'ajax=' ||
+      c_version || chr(38) || 'ajax=' ||
       apex_escape.html_attribute(apex_plugin.get_ajax_identifier) || chr(38) || 'app=' || l_app || '"></iframe>');
   END render;
 
