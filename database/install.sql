@@ -29,6 +29,10 @@ PROMPT Installing APEX Visual Designer into &&VD_SCHEMA for host schema &&HOST_S
 
 -- The plug-in runs with the host schema's rights, so the host schema needs every package.
 BEGIN
+  IF UPPER('&&HOST_SCHEMA') = UPPER('&&VD_SCHEMA') THEN
+    DBMS_OUTPUT.PUT_LINE('Host schema is the designer schema: no grants needed.');
+    RETURN;
+  END IF;
   FOR p IN (SELECT column_value name FROM TABLE(sys.odcivarchar2list(
               'PKG_VD_DESIGN_API', 'PKG_VD_PAGE_CODE', 'PKG_VD_THEME', 'PKG_VD_PAGE_WRITER', 'PKG_VD_PLUGIN'))) LOOP
     EXECUTE IMMEDIATE 'GRANT EXECUTE ON ' || DBMS_ASSERT.ENQUOTE_NAME(UPPER('&&VD_SCHEMA')) || '.' || p.name ||

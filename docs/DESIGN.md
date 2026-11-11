@@ -2,7 +2,7 @@
 
 Date: 2026-11-11
 Status: draft for approval
-Builds on: the Flutter Designer and Theme Designer as they run on page 19 of app 144
+Builds on: the Flutter Designer and Theme Designer as they run on a page of the pilot application
 (branch `feature/flutter-designer`, commit `4905802`).
 
 ## Intent
@@ -44,7 +44,7 @@ A developer installs it in three steps:
   - *Height*: optional.
 - **Database:** one `install.sql` and one `uninstall.sql`.
   - The schema name is a substitution variable, default `VD_DESIGNER`. Nothing is hardcoded to
-    `HTML_DESIGN`.
+    the pilot schema.
   - Grants go to the host app's parsing schema, which is passed as a parameter.
   - It installs today's objects:
     - packages: design API (`assert_target_app`), page code, page writer, theme;
@@ -72,7 +72,7 @@ A developer installs it in three steps:
 
 ## Anti-goals
 
-- The current pilot must keep working. Page 19 in app 144 is not changed by this work. The owner
+- The current pilot must keep working. The pilot page is not changed by this work. The owner
   can switch to the plug-in when ready.
 - No behaviour change in the designers: same designs, settings, saves, history, push and
   restore.

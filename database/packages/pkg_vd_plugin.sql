@@ -63,7 +63,7 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
       RETURN;
     END IF;
     sys.htp.p('<iframe class="vd-designer" title="APEX Visual Designer" style="display:block;width:100%;height:' ||
-      l_height || 'px;border:0" src="' || p_plugin.file_prefix || 'index.html?v=' ||
+      l_height || 'px;border:0" src="' || apex_escape.html_attribute(p_plugin.file_prefix) || 'index.html?v=' ||
       c_version || chr(38) || 'ajax=' ||
       apex_escape.html_attribute(apex_plugin.get_ajax_identifier) || chr(38) || 'app=' || l_app || '"></iframe>');
   END render;

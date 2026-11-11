@@ -19,12 +19,16 @@ The browser cannot widen either check, because the region attributes are read on
 
 The designer never writes into the page it runs on.
 
+## What the authorization scheme grants
+
+A user the *Designer authorization* scheme admits can write JavaScript that runs for every user of every registered target application: page JavaScript, and `vd-theme.js`, which page 0 loads on every page. Give the scheme only to people you would trust as developers of those applications. Register only the applications they should change.
+
 ## Privileges
 
 - The designer schema owns its tables and packages. It grants EXECUTE on them to the host application's parsing schema only.
 - `PKG_VD_PLUGIN` and `PKG_VD_PAGE_WRITER` use invoker rights. APEX metadata reads and page writes run with the host schema's own rights, inside the current APEX workspace.
 - The workspace and user always come from the APEX session, never from the request.
-- Anyone who can run code as the host schema (for example in SQL Workshop) can call the packages directly. Treat that schema as trusted, as you already do for its application.
+- Anyone who can run code as the host schema (for example in SQL Workshop) can call the packages directly. This skips the Designer authorization check; only the workspace and registration checks remain. Treat that schema, and every application that parses as it, as trusted. If several applications share the parsing schema, consider a separate parsing schema for the host application.
 
 ## Input handling
 

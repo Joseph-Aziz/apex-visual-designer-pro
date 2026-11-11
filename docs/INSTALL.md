@@ -89,4 +89,6 @@ Run `install.sql` again with the same arguments, then import the new plug-in exp
 2. As `MY_APP_SCHEMA`, run `DROP SYNONYM VD_DESIGNER_API;`.
 3. As `VD_DESIGNER`, run `@uninstall.sql VD_DESIGNER`. This deletes all saved versions.
 
+If you run step 3 before steps 1 and 2, the host page fails with an invalid synonym error until the region is removed.
+
 Designed applications keep working, because their CSS and JS live in their own pages and files.

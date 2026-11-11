@@ -12,4 +12,4 @@ This is the first release as a native APEX region plug-in.
   - history, restore and download.
 - **Database scripts:** install, host setup, target registration and uninstall, with a configurable schema name.
 
-Before 1.0.0, the designer ran as page 19 of a single pilot application (app 144, workspace stantony). That setup is not part of this repository.
+Before 1.0.0, the designer ran as page 19 of a single pilot application. That setup is not part of this repository.
