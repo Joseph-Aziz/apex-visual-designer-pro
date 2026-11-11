@@ -32,6 +32,13 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
   -- prefix (which APEX versions itself) in front of it.
   c_version CONSTANT VARCHAR2(20) := '1.0.0';
 
+  -- A region attribute. APEX 26.2 keeps them in p_region.attributes; the classic
+  -- attribute_NN fields stay empty for regions created or edited in 26.2.
+  FUNCTION attr(p_region IN apex_plugin.t_region, p_name IN VARCHAR2) RETURN VARCHAR2 IS
+  BEGIN
+    RETURN p_region.attributes.get_varchar2(p_name);
+  END attr;
+
   FUNCTION allowed(p_scheme IN VARCHAR2) RETURN BOOLEAN IS
     l_n NUMBER;
   BEGIN
@@ -48,10 +55,10 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
   PROCEDURE render(p_region IN apex_plugin.t_region, p_plugin IN apex_plugin.t_plugin,
                    p_param IN apex_plugin.t_region_render_param,
                    p_result IN OUT NOCOPY apex_plugin.t_region_render_result) IS
-    l_app    NUMBER := COALESCE(TO_NUMBER(p_region.attribute_02 DEFAULT NULL ON CONVERSION ERROR), NV('APP_ID'));
-    l_height NUMBER := COALESCE(TO_NUMBER(p_region.attribute_03 DEFAULT NULL ON CONVERSION ERROR), 800);
+    l_app    NUMBER := COALESCE(TO_NUMBER(attr(p_region, 'attribute_02') DEFAULT NULL ON CONVERSION ERROR), NV('APP_ID'));
+    l_height NUMBER := COALESCE(TO_NUMBER(attr(p_region, 'attribute_03') DEFAULT NULL ON CONVERSION ERROR), 800);
   BEGIN
-    IF NOT allowed(p_region.attribute_01) THEN
+    IF NOT allowed(attr(p_region, 'attribute_01')) THEN
       sys.htp.p('<p class="vd-denied">You are not allowed to use the Visual Designer.</p>');
       RETURN;
     END IF;
@@ -328,7 +335,7 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
                  p_param IN apex_plugin.t_region_ajax_param,
                  p_result IN OUT NOCOPY apex_plugin.t_region_ajax_result) IS
   BEGIN
-    IF NOT allowed(p_region.attribute_01) THEN
+    IF NOT allowed(attr(p_region, 'attribute_01')) THEN
       RAISE_APPLICATION_ERROR(-20235, 'You are not allowed to use the Visual Designer.');
     END IF;
     CASE apex_application.g_x10
