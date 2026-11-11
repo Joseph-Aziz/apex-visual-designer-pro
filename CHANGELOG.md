@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 - 2026-11-11
+
+- **Fix:** opening a page of another application in the designer no longer ends the host application session. The live preview now passes the session id only for the host application's own pages.
+- **Install:** `install.sql` skips the grants when the host schema is the designer schema.
+
 ## 1.0.0 - 2026-11-11
 
 This is the first release as a native APEX region plug-in.
