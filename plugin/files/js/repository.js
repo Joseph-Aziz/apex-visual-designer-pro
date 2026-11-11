@@ -1,5 +1,6 @@
-/* APEX Visual Designer - Oracle repository adapter for the Flutter Designer.
-   Talks to the page 19 On Demand processes VD_PAGE_COMPONENTS and VD_FLUTTER. */
+/* APEX Visual Designer - server calls. Every call goes to the AJAX handler of the Visual
+   Designer region that hosts this editor (VD.config.ajax), with x10 naming the handler part:
+   components (page components), flutter (page designs), theme (app theme). */
 (function () {
   window.VD = window.VD || {};
   var VD = window.VD;
@@ -10,24 +11,25 @@
     return e;
   }
 
+  // The host page's apex object (the editor runs in a same-origin iframe of the region).
   function apexApi() {
-    if (window.apex && window.apex.server && window.apex.server.process) return window.apex;
     try {
-      if (window.parent && window.parent !== window &&
-          window.parent.apex && window.parent.apex.server &&
-          window.parent.apex.server.process) {
-        return window.parent.apex;
-      }
-    } catch (e) { /* cross-origin/desktop */ }
+      if (window.parent && window.parent.apex && window.parent.apex.server && window.parent.apex.server.plugin) return window.parent.apex;
+    } catch (e) { /* not same origin */ }
     return null;
   }
 
+  var PART = { VD_PAGE_COMPONENTS: 'components', VD_FLUTTER: 'flutter', VD_THEME: 'theme' };
+
   function callProcess(name, data) {
-    var api = apexApi();
-    if (!api) return Promise.reject(repoError('VD_OFFLINE', 'Oracle repository is unavailable.'));
+    var api = apexApi(), ajax = VD.config && VD.config.ajax;
+    if (!api || !ajax) return Promise.reject(repoError('VD_OFFLINE', 'The designer must run inside an APEX Visual Designer region.'));
+    var payload = {};
+    Object.keys(data || {}).forEach(function (k) { payload[k] = data[k]; });
+    payload.x10 = PART[name];
     return new Promise(function (resolve, reject) {
       try {
-        var req = api.server.process(name, data || {}, { dataType: 'json', cache: false });
+        var req = api.server.plugin(ajax, payload, { dataType: 'json' });
         if (req && typeof req.done === 'function') {
           req.done(function (response) {
             if (response && response.success === false) {
@@ -55,7 +57,7 @@
     return callProcess('VD_PAGE_COMPONENTS', { x01: String(appId), x02: String(pageId) });
   }
 
-  // Flutter designer: one On Demand process, VD_FLUTTER, with x03 as the action.
+  // Flutter designer: the region handler part "flutter", with x03 as the action.
   function flutterCall(action, appId, pageId, extra) {
     var data = { x01: String(appId), x02: String(pageId), x03: action };
     Object.keys(extra || {}).forEach(function (k) { data[k] = extra[k]; });
@@ -85,7 +87,7 @@
     return flutterCall('cssclass', appId, pageId, { x05: kind, x06: String(componentId), x07: type, x08: cls || '' });
   }
 
-  // Theme designer: one On Demand process, VD_THEME, with x02 as the action.
+  // Theme designer: the region handler part "theme", with x02 as the action.
   function themeCall(action, appId, extra) {
     var data = { x01: String(appId), x02: action };
     Object.keys(extra || {}).forEach(function (k) { data[k] = extra[k]; });

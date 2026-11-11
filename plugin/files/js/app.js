@@ -3,6 +3,10 @@
   window.VD = window.VD || {};
   var VD = window.VD;
 
+  // Set by the region's render: index.html?v=<version>&ajax=<AJAX identifier>&app=<default target app>.
+  var params = new URLSearchParams(location.search);
+  VD.config = { ajax: params.get('ajax'), app: Number(params.get('app')) || null, build: params.get('v') };
+
   // view name -> module with enter()
   var VIEWS = {
     flutter: function () { return VD.flutterMode; },
