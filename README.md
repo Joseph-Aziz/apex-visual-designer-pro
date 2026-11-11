@@ -5,4 +5,12 @@ designer. Add the region to a page, open another page of a registered applicatio
 for each region, item and button, and save: the generated CSS and JavaScript go into that page.
 A Theme Designer sets one look for the whole application and pushes it as a single CSS file.
 
-Install: see [docs/INSTALL.md](docs/INSTALL.md).
+- Install: [docs/INSTALL.md](docs/INSTALL.md)
+- Using it: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
+- Security: [docs/SECURITY.md](docs/SECURITY.md)
+
+Requires Oracle APEX 26.2. License: MIT.
+
+Rebuild the plug-in export after changing `plugin/files`: `node tools/build_plugin.js`.
+Tests: `node tests/unit/<name>_test.js` for each file in `tests/unit`; the SQL suites in
+`tests/db` run in an APEX SQL Workshop session (see each file's header).
