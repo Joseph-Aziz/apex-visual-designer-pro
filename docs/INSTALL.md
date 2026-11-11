@@ -64,6 +64,8 @@ Protect the page itself with the same authorization scheme. The server checks th
 
 Without these settings, opening pages works, but saving fails with "An API call has been prohibited".
 
+**Live preview of other applications.** To preview another application's pages inside the designer, both applications need Session Sharing set to Workspace Sharing in their current authentication scheme (Shared Components > Authentication Schemes), and the designed application needs Security Attributes > Browser Security > Embed in Frames set to "Allow from same origin". Without these settings, the component list still works but the preview stays blank.
+
 ## 6. Register the applications to design
 
 Run this in the workspace's SQL Workshop, or in SQLcl connected as `VD_DESIGNER` with the workspace set:
