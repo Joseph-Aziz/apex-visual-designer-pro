@@ -57,6 +57,13 @@ Create a page (a blank page is enough). Add a region of type **APEX Visual Desig
 
 Protect the page itself with the same authorization scheme. The server checks the attribute on every call either way.
 
+**Allow the page writes.** APEX blocks its import API at runtime unless the host application allows it. In App Builder, open the host application, then go to Shared Components > Security Attributes > Runtime API Usage, and tick:
+
+- **Modify This Application**, to design the host application itself;
+- **Modify Other Applications**, to design other applications of the workspace.
+
+Without these settings, opening pages works, but saving fails with "An API call has been prohibited".
+
 ## 6. Register the applications to design
 
 Run this in the workspace's SQL Workshop, or in SQLcl connected as `VD_DESIGNER` with the workspace set:

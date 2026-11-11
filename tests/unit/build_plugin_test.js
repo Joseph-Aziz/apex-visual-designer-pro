@@ -17,6 +17,8 @@ assert.ok(sql.includes(",p_name=>'COM.APEXVD.VISUAL_DESIGNER'"));
 assert.ok(sql.includes(",p_display_name=>'APEX Visual Designer'"));
 assert.ok(sql.includes(",p_render_function=>'VD_DESIGNER_API.render'"));
 assert.ok(sql.includes(",p_ajax_function=>'VD_DESIGNER_API.ajax'"));
+// procedure-style render and AJAX callbacks (p_result IN OUT) need plug-in API version 2
+assert.ok(sql.includes(',p_api_version=>2'), 'api version 2');
 assert.ok(sql.includes(",p_version_identifier=>'9.9.9'"));
 ['attribute_01', 'attribute_02', 'attribute_03'].forEach((a) =>
   assert.ok(sql.includes(",p_static_id=>'" + a + "'"), a));

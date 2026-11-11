@@ -19,6 +19,11 @@ CREATE OR REPLACE PACKAGE &&VD_SCHEMA..PKG_VD_PLUGIN AUTHID CURRENT_USER AS
   -- TRUE when the current session may design: an App Builder developer session when p_scheme is
   -- empty, otherwise the named authorization scheme of the host app. An unknown name is FALSE.
   FUNCTION allowed(p_scheme IN VARCHAR2) RETURN BOOLEAN;
+  -- The same two callbacks in the function style APEX also uses for region plug-ins.
+  FUNCTION render(p_region IN apex_plugin.t_region, p_plugin IN apex_plugin.t_plugin,
+                  p_is_printer_friendly IN BOOLEAN) RETURN apex_plugin.t_region_render_result;
+  FUNCTION ajax(p_region IN apex_plugin.t_region, p_plugin IN apex_plugin.t_plugin)
+    RETURN apex_plugin.t_region_ajax_result;
 END PKG_VD_PLUGIN;
 /
 
@@ -339,6 +344,24 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
       apex_json.write('code', SQLCODE);
       apex_json.write('message', CASE WHEN SQLCODE BETWEEN -20299 AND -20200 THEN SQLERRM ELSE 'Visual Designer request failed.' END);
       apex_json.close_object;
+  END ajax;
+
+  FUNCTION render(p_region IN apex_plugin.t_region, p_plugin IN apex_plugin.t_plugin,
+                  p_is_printer_friendly IN BOOLEAN) RETURN apex_plugin.t_region_render_result IS
+    l_param  apex_plugin.t_region_render_param;
+    l_result apex_plugin.t_region_render_result;
+  BEGIN
+    render(p_region, p_plugin, l_param, l_result);
+    RETURN l_result;
+  END render;
+
+  FUNCTION ajax(p_region IN apex_plugin.t_region, p_plugin IN apex_plugin.t_plugin)
+    RETURN apex_plugin.t_region_ajax_result IS
+    l_param  apex_plugin.t_region_ajax_param;
+    l_result apex_plugin.t_region_ajax_result;
+  BEGIN
+    ajax(p_region, p_plugin, l_param, l_result);
+    RETURN l_result;
   END ajax;
 END PKG_VD_PLUGIN;
 /

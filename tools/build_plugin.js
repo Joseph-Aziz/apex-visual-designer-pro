@@ -79,7 +79,7 @@ wwv_flow_imp_shared.create_plugin(
 ,p_plugin_type=>'REGION TYPE'
 ,p_name=>'${NAME}'
 ,p_display_name=>'APEX Visual Designer'
-,p_api_version=>1
+,p_api_version=>2
 ,p_render_function=>'VD_DESIGNER_API.render'
 ,p_ajax_function=>'VD_DESIGNER_API.ajax'
 ,p_substitute_attributes=>true
