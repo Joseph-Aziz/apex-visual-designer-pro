@@ -74,6 +74,10 @@
     Object.keys(extra || {}).forEach(function (k) { data[k] = extra[k]; });
     return callProcess('VD_FLUTTER', data);
   }
+  // -> { token, slots, regions, items } (layout board)
+  function layout(appId, pageId) {
+    return flutterCall('layout', appId, pageId).then(function (r) { return r.layout; });
+  }
   // -> { token, css, js, design? }
   function readFlutter(appId, pageId) { return flutterCall('read', appId, pageId); }
   // -> { token }
@@ -132,6 +136,7 @@
     saveFlutter: saveFlutter,
     flutterHistory: flutterHistory,
     restoreFlutter: restoreFlutter,
-    setStaticId: setStaticId
+    setStaticId: setStaticId,
+    layout: layout
   };
 })();

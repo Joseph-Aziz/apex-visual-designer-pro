@@ -193,6 +193,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PLUGIN AS
     l_v_css  CLOB;
     l_v_js   CLOB;
     l_design CLOB;
+    l_layout CLOB;
     l_token  VARCHAR2(100);
     l_body   JSON_OBJECT_T;
     l_cur    SYS_REFCURSOR;
@@ -230,6 +231,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PLUGIN AS
         TO_NUMBER(apex_application.g_x06), apex_application.g_x07, apex_application.g_x08);
     ELSIF l_action = 'history' THEN
       l_cur := pkg_vd_page_code.list_versions(l_app, l_page);
+    ELSIF l_action = 'layout' THEN
+      l_layout := pkg_vd_page_code.layout_json(l_app, l_page);
     ELSE
       RAISE_APPLICATION_ERROR(-20233, 'Unknown designer action.');
     END IF;
@@ -241,6 +244,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PLUGIN AS
       apex_json.write('css', l_css);
       apex_json.write('js', l_js);
       IF l_design IS NOT NULL THEN apex_json.write_raw('design', l_design); END IF;
+    ELSIF l_action = 'layout' THEN
+      apex_json.write_raw('layout', l_layout);
     ELSIF l_action = 'history' THEN
       apex_json.open_array('versions');
       LOOP

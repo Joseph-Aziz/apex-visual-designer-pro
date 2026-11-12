@@ -29,12 +29,14 @@ function load(ajax) {
   await a.R.listPageComponents(5, 7);
   assert.deepStrictEqual(a.calls[2].data, { x01: '5', x02: '7', x10: 'components' });
   assert.strictEqual(a.calls[2].opt.dataType, 'json');
+  await a.R.layout(5, 7);
+  assert.deepStrictEqual(a.calls[3].data, { x01: '5', x02: '7', x03: 'layout', x10: 'flutter' }, 'layout read');
 
   // two regions on one page: each editor uses its own region's identifier
   const b = load('AJ2');
   await b.R.readFlutter(5, 7);
   assert.strictEqual(b.calls[0].id, 'AJ2');
-  assert.strictEqual(a.calls.length, 3, 'region 1 untouched by region 2');
+  assert.strictEqual(a.calls.length, 4, 'region 1 untouched by region 2');
 
   // no region identifier: the call is refused
   const c = load(null);
