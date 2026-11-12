@@ -25,8 +25,7 @@ A user the *Designer authorization* scheme admits can write JavaScript that runs
 
 ## Privileges
 
-- **Quick start:** the tables and packages live in the host application's parsing schema, and run with that schema's rights. No grants or synonyms are created. Code the plug-in installs comes only from the plug-in's own file `install/vd-install.sql`, which only someone who can import plug-ins into the application can change. That person can therefore run any DDL or DML as the parsing schema at the next page view. Install errors show their Oracle detail only to developers signed in to App Builder.
-- **Separate designer schema:** that schema owns the tables and packages. It grants EXECUTE on them to the host application's parsing schema only.
+- The tables and packages live in the host application's parsing schema, and run with that schema's rights. No grants or synonyms are created. Code the plug-in installs comes only from the plug-in's own file `install/vd-install.sql`, which only someone who can import plug-ins into the application can change. That person can therefore run any DDL or DML as the parsing schema at the next page view. Install errors show their Oracle detail only to developers signed in to App Builder.
 - `PKG_VD_PLUGIN` and `PKG_VD_PAGE_WRITER` use invoker rights. APEX metadata reads and page writes run with the host schema's own rights, inside the current APEX workspace.
 - The workspace and user always come from the APEX session, never from the request.
 - Anyone who can run code as the host schema (for example in SQL Workshop) can call the packages directly. This skips the Designer authorization check; only the workspace and registration checks remain. Treat that schema, and every application that parses as it, as trusted. If several applications share the parsing schema, consider a separate parsing schema for the host application.

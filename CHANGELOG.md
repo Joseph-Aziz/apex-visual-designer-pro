@@ -5,7 +5,7 @@
 - **One-step install:**
   - Import the plug-in and add the region; nothing else is needed.
   - On the first page view, the plug-in creates its tables and packages in the application's parsing schema and registers the application. A newer plug-in version updates them on the next view.
-  - The separate designer schema remains available as an advanced setup. Its host synonym is now `PKG_VD_PLUGIN`, and it replaces `VD_DESIGNER_API`.
+  - The install guide covers only this one-step install. The separate designer schema setup is no longer documented.
 - **Add application:** the Flutter Designer can register another application of the workspace.
 - **Clearer error:** when Runtime API Usage blocks a save, the designer names the setting to change.
 
