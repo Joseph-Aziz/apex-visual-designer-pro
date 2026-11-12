@@ -6,13 +6,13 @@
 2. **Allow page edits.** In the same application, go to Shared Components > Security Attributes > Runtime API Usage and tick **Modify This Application**.
 3. **Add the region.** Create a page (a blank page is enough) and add a region of type **APEX Visual Designer**. Run the page.
 
-On that first page view, the plug-in creates its tables and packages in the application's parsing schema, registers the application, and shows the designer. This takes a few seconds, once. Nothing else is needed: no extra schema, no grants, no SQL scripts.
+On that first page view, the plug-in creates its tables and packages in the application's parsing schema, registers the application, and shows the designer. This takes a few seconds, once. No extra schema and no SQL scripts are needed.
 
 **Requirements:**
 - Oracle APEX 26.2 and Oracle Database 19c or later.
 - The parsing schema of the host application holds CREATE TABLE, CREATE SEQUENCE, CREATE PROCEDURE and CREATE TRIGGER. Schemas that APEX creates for a workspace have them.
 
-If the install fails, the region says which install step failed and the Oracle error. Fix the cause (usually a missing privilege) and reload the page: the install runs again.
+If the install fails, a developer who opens the page from App Builder sees which install step failed and the Oracle error; other users see a short notice. Fix the cause (usually a missing privilege) and reload the page: the install runs again.
 
 ### Region attributes
 

@@ -75,3 +75,9 @@ assert.strictEqual(chunks.length, slashes, 'one chunk per statement');
 // importable into any workspace: no environment values, only the import defaults APEX overrides
 assert.ok(!/p_default_workspace_id=>\d/.test(sql), 'workspace comes from the importing session');
 console.log('build_plugin_test: all passed');
+// review fixes: a peer creating VD_INSTALL first is not an error; invalid packages fail the
+// install; Oracle error detail reaches only developers
+assert.ok(sql.includes('IF SQLCODE <> -955 THEN RAISE; END IF;'), 'ignores ORA-00955 from a peer');
+assert.ok(sql.includes("STATUS <> ''VALID''"), 'checks packages compiled');
+assert.ok(sql.includes('apex_application.g_edit_cookie_session_id IS NULL'), 'hides detail from non-developers');
+console.log('build_plugin_test review fixes: passed');

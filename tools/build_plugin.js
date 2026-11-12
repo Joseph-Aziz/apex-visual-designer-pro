@@ -32,13 +32,22 @@ const INSTALL = ['tables/vd_install', 'tables/vd_target_applications', 'tables/v
   'tables/vd_theme_versions', 'packages/pkg_vd_design_api', 'packages/pkg_vd_page_code', 'packages/pkg_vd_theme',
   'packages/pkg_vd_page_writer', 'packages/pkg_vd_plugin'];
 
+// A cut at a "/" line inside a comment or literal, or the separator inside the text, would run a
+// broken statement on the database; stop the build instead.
+function checkChunk(file, chunk) {
+  if (chunk.includes(MARK.trim())) throw new Error(file + '.sql: contains the statement separator');
+  const code = chunk.replace(/^(\s*--[^\n]*\n)+/, '').trim();
+  if (!/^(CREATE|DECLARE|BEGIN)\b/i.test(code)) throw new Error(file + '.sql: a statement does not start with CREATE, DECLARE or BEGIN');
+  if (!/\bEND(\s+\w+)?\s*;$/i.test(code)) throw new Error(file + '.sql: a statement does not end with END;');
+}
+
 function installScript() {
   const chunks = [];
   INSTALL.forEach((f) => {
     const text = fs.readFileSync(path.join(ROOT, 'database', f + '.sql'), 'utf8').replace(/\r\n/g, '\n');
     const parts = text.split(/^\/[ \t]*$/m);
     if (parts.pop().trim()) throw new Error(f + '.sql: text after the last "/"');
-    parts.forEach((c) => { if (c.trim()) chunks.push(c.trim()); });
+    parts.forEach((c) => { if (c.trim()) { checkChunk(f, c.trim()); chunks.push(c.trim()); } });
   });
   return chunks.join(MARK) + MARK;
 }
@@ -131,5 +140,8 @@ set verify on feedback on define on
 prompt  ...done
 `;
 
+module.exports = { checkChunk };
+if (require.main === module) {
 fs.writeFileSync(OUT, sql);
 console.log('wrote ' + path.relative(process.cwd(), OUT) + ' (' + (list(FILES).length + 1) + ' files, version ' + VERSION + ')');
+}

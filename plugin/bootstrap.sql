@@ -56,6 +56,11 @@ BEGIN
   IF l_n = 0 THEN
     RETURN 'Install script install/vd-install.sql is empty.';
   END IF;
+  -- A package with compile errors must not be recorded as installed.
+  FOR o IN (SELECT OBJECT_NAME, OBJECT_TYPE FROM USER_OBJECTS
+             WHERE OBJECT_NAME LIKE 'PKG\_VD\_%' ESCAPE '\' AND STATUS <> 'VALID') LOOP
+    RETURN 'Install failed: ' || o.OBJECT_TYPE || ' ' || o.OBJECT_NAME || ' did not compile.';
+  END LOOP;
   RETURN NULL;
 EXCEPTION
   WHEN NO_DATA_FOUND THEN
@@ -84,6 +89,9 @@ BEGIN
           INSTALLED_AT TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP NOT NULL,
           CONSTRAINT VD_INSTALL_PK PRIMARY KEY (ID), CONSTRAINT VD_INSTALL_ONE_CK CHECK (ID = 1))';
       END IF;
+    EXCEPTION
+      -- Another session created it first.
+      WHEN OTHERS THEN IF SQLCODE <> -955 THEN RAISE; END IF;
     END;]';
   FOR i IN 1 .. 60 LOOP
     BEGIN
@@ -120,6 +128,13 @@ BEGIN
   EXECUTE IMMEDIATE 'UPDATE VD_INSTALL SET VERSION = :v, INSTALLED_AT = SYSTIMESTAMP WHERE ID = 1'
     USING CASE WHEN l_msg IS NULL THEN c_vd_version ELSE 'FAILED' END;
   COMMIT;
+  -- The Oracle detail can show schema and privilege names: only developers see it.
+  IF l_msg IS NOT NULL THEN
+    apex_debug.error(l_msg);
+    IF apex_application.g_edit_cookie_session_id IS NULL THEN
+      l_msg := 'The Visual Designer could not be installed. A developer can see why by opening this page from App Builder.';
+    END IF;
+  END IF;
   RETURN l_msg;
 END vd_ensure;
 
