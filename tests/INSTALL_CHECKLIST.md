@@ -14,7 +14,7 @@ Last run: 2026-11-12, APEX 26.2, an existing host application.
 | Q4 | Add application: own app accepted; an id outside the workspace refused with -20231 | PASS |
 | Q5 | Re-import with the installed version marked old: the next view reinstalls and keeps registrations | PASS |
 | Q6 | Saving with Runtime API Usage off shows the "Allow page edits" message | Not run (needs the owner to change the setting) |
-| Q7 | Import through App Builder's Import wizard from a GitHub download | Owner's clean test |
+| Q7 | Import through App Builder's Import wizard, then add the region | PASS (after the header fix: the wizard needs plain values in import_begin) |
 
 ## Separate designer schema (1.0.x)
 
@@ -55,5 +55,5 @@ designer schema and a new host application. Record each result.
 
 ## Not covered by this run
 
-- Importing the export file through App Builder's Import wizard. The run loaded the same blocks through SQL Commands.
+- (1.1.0 run covered the Import wizard.)
 - A designer schema named other than `VD_TEST`/`VD_DESIGNER` on a second database.
