@@ -42,11 +42,17 @@
     return !!(slot && slot.grid);
   }
 
+  // Regions and items make separate rows, as the page's grid does (sub-regions first, then items).
   function rows(board, container) {
     var out = [];
-    (board.order[container] || []).forEach(function (k, i) {
-      var c = board.comps[k];
-      if (i === 0 || c.newRow || !hasGrid(board, container)) out.push([c]); else out[out.length - 1].push(c);
+    ['region', 'item'].forEach(function (kind) {
+      var first = true;
+      (board.order[container] || []).forEach(function (k) {
+        var c = board.comps[k];
+        if (c.kind !== kind) return;
+        if (first || c.newRow || !hasGrid(board, container)) out.push([c]); else out[out.length - 1].push(c);
+        first = false;
+      });
     });
     return out;
   }
@@ -94,6 +100,10 @@
 
     return attempt(board, function () {
       var from = containerOf(c);
+      // The box after this one, of the same kind, keeps its row when this one led it.
+      var same = board.order[from].filter(function (x) { return board.comps[x].kind === kind; });
+      var after = board.comps[same[same.indexOf(k) + 1]];
+      if (after && (c.newRow || same.indexOf(k) === 0)) after.newRow = true;
       board.order[from] = board.order[from].filter(function (x) { return x !== k; });
       if (kind === 'region') {
         if (to.indexOf('slot:') === 0) { c.parent = null; c.slot = to.slice(5); } else { c.parent = to.slice(7); c.slot = SUB; }
@@ -112,7 +122,7 @@
       c.colStart = null;
       renumber(board, from);
       renumber(board, to);
-      return checkRows(board, to);
+      return checkRows(board, from) || checkRows(board, to);
     });
   }
 

@@ -107,4 +107,26 @@ ch = M.changes(b);
 assert.strictEqual(find(ch, 'R1').colStart, null, 'moved colStart cleared');
 assert.strictEqual(find(ch, 'R2').colStart, 9, 'unmoved keeps colStart');
 
+// review fix: leaving a row keeps the next box on its own row
+function rowFixture() {
+  const f = fixture();
+  f.regions = [
+    { id: 'A', title: 'A', parent: null, slot: 'BODY', seq: 10, newRow: true, newCol: true, colStart: null, span: 6, hidden: false },
+    { id: 'B', title: 'B', parent: null, slot: 'BODY', seq: 20, newRow: true, newCol: true, colStart: null, span: 8, hidden: false },
+    { id: 'C', title: 'C', parent: null, slot: 'BODY', seq: 30, newRow: false, newCol: true, colStart: null, span: 4, hidden: false },
+    { id: 'R1', title: 'One', parent: null, slot: 'BODY', seq: 40, newRow: true, newCol: true, colStart: null, span: null, hidden: false }
+  ];
+  f.items = [];
+  return f;
+}
+b = M.load(rowFixture());
+assert.ok(M.move(b, 'region', 'B', { container: 'region:R1', before: null, sameRow: false }).ok, 'move B into R1');
+assert.strictEqual(b.comps['region:C'].newRow, true, 'C starts a new row after B leaves');
+assert.strictEqual(M.rows(b, 'slot:BODY').length, 3, 'A, C and R1 rows kept');
+
+// review fix: rows are grouped per kind, as the server does
+b = M.load(fixture());
+b.comps['region:R3'].span = 8; b.comps['item:I1'].span = 8; b.comps['item:I1'].newRow = false;
+assert.ok(M.setSpan(b, 'item', 'I1', 8).ok, 'span-8 item after span-8 sub-region is a separate row');
+
 console.log('layout_model_test: all passed');
