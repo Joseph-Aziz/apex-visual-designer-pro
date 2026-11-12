@@ -7,6 +7,9 @@
 CREATE OR REPLACE PACKAGE PKG_VD_DESIGN_API AUTHID DEFINER AS
   -- Raises ORA-20215 unless p_app_id is an active target of the current workspace.
   PROCEDURE assert_target_app(p_app_id IN NUMBER);
+  -- Registers p_app_id (an application of the current workspace) as an active target, or
+  -- re-activates it. Raises ORA-20231 for an application outside the current workspace.
+  PROCEDURE register_app(p_app_id IN NUMBER);
 END PKG_VD_DESIGN_API;
 /
 
@@ -38,6 +41,28 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_DESIGN_API AS
       RAISE_APPLICATION_ERROR(-20215, 'Application is not a registered active target.');
     END IF;
   END assert_target_app;
+
+  PROCEDURE register_app(p_app_id IN NUMBER) IS
+    l_workspace NUMBER := current_workspace;
+    l_owner     VARCHAR2(128);
+    l_name      VARCHAR2(255);
+    l_alias     VARCHAR2(255);
+  BEGIN
+    BEGIN
+      SELECT OWNER, APPLICATION_NAME, ALIAS INTO l_owner, l_name, l_alias
+        FROM APEX_APPLICATIONS
+       WHERE APPLICATION_ID = p_app_id AND WORKSPACE_ID = l_workspace;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20231, 'Application ' || p_app_id || ' is not in this workspace.');
+    END;
+    MERGE INTO VD_TARGET_APPLICATIONS t
+    USING (SELECT l_workspace ws, p_app_id app FROM DUAL) s
+       ON (t.WORKSPACE_ID = s.ws AND t.APP_ID = s.app)
+     WHEN MATCHED THEN UPDATE SET IS_ACTIVE = 'Y', PARSING_SCHEMA = l_owner, TARGET_NAME = l_name, APP_ALIAS = l_alias
+     WHEN NOT MATCHED THEN INSERT (WORKSPACE_ID, APP_ID, APP_ALIAS, PARSING_SCHEMA, TARGET_NAME)
+          VALUES (s.ws, s.app, l_alias, l_owner, l_name);
+  END register_app;
 
 END PKG_VD_DESIGN_API;
 /

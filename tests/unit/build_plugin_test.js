@@ -20,7 +20,13 @@ assert.ok(sql.includes(",p_render_function=>'vd_render'"));
 assert.ok(sql.includes(",p_ajax_function=>'vd_ajax'"));
 assert.ok(sql.includes(',p_plsql_code=>wwv_flow_string.join(wwv_flow_t_varchar2('), 'plug-in PL/SQL code');
 assert.ok(!sql.includes('VD_DESIGNER_API'), 'no synonym wording');
-// procedure-style render and AJAX callbacks (p_result IN OUT) need plug-in API version 2
+assert.ok(sql.includes("c_vd_version CONSTANT VARCHAR2(20) := ''9.9.9'';"), 'bootstrap carries the build version');
+assert.ok(!sql.includes('#VD_VERSION#'), 'no version placeholder left');
+// APEX calls inline plug-in code through the function interface, whatever the API version
+assert.ok(sql.includes("'FUNCTION vd_render(p_region IN apex_plugin.t_region, p_plugin IN apex_plugin.t_plugin,',"), 'render function');
+assert.ok(sql.includes('p_is_printer_friendly IN BOOLEAN) RETURN apex_plugin.t_region_render_result IS'), 'render returns the result');
+assert.ok(sql.includes("'FUNCTION vd_ajax(p_region IN apex_plugin.t_region, p_plugin IN apex_plugin.t_plugin)',"), 'ajax function');
+// plug-in API version 2
 assert.ok(sql.includes(',p_api_version=>2'), 'api version 2');
 assert.ok(sql.includes(",p_version_identifier=>'9.9.9'"));
 ['attribute_01', 'attribute_02', 'attribute_03'].forEach((a) =>

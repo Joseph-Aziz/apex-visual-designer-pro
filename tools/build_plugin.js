@@ -49,7 +49,8 @@ function fileBlock(abs) {
 
 // The plug-in's own PL/SQL code, as APEX exports it.
 function plsqlCode() {
-  const text = fs.readFileSync(path.join(ROOT, 'plugin', 'bootstrap.sql'), 'utf8').replace(/\r\n/g, '\n');
+  const text = fs.readFileSync(path.join(ROOT, 'plugin', 'bootstrap.sql'), 'utf8').replace(/\r\n/g, '\n')
+    .split('#VD_VERSION#').join(VERSION);
   const lines = text.replace(/\n+$/, '').split('\n');
   return 'wwv_flow_string.join(wwv_flow_t_varchar2(\n' + lines.map(q).join(',\n') + '))';
 }
