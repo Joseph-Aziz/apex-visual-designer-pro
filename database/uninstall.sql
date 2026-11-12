@@ -3,7 +3,7 @@
 --   @uninstall.sql VD_DESIGNER
 -- Drops the designer packages, tables and sequence, including all saved versions. Target
 -- applications keep what was saved into them (page CSS and JS, vd-theme.css, the page 0 link).
--- Drop the synonym VD_DESIGNER_API in the host schema and the plug-in in the app yourself.
+-- Drop the synonym PKG_VD_PLUGIN in the host schema and the plug-in in the app yourself.
 SET DEFINE ON
 SET VERIFY OFF
 SET SERVEROUTPUT ON
@@ -23,7 +23,7 @@ BEGIN
     x('DROP PACKAGE &&VD_SCHEMA..' || p.n);
   END LOOP;
   FOR t IN (SELECT column_value n FROM TABLE(sys.odcivarchar2list(
-              'VD_THEME_VERSIONS', 'VD_PAGE_CODE_VERSIONS', 'VD_TARGET_APPLICATIONS'))) LOOP
+              'VD_THEME_VERSIONS', 'VD_PAGE_CODE_VERSIONS', 'VD_TARGET_APPLICATIONS', 'VD_INSTALL'))) LOOP
     x('DROP TABLE &&VD_SCHEMA..' || t.n || ' PURGE');
   END LOOP;
   x('DROP SEQUENCE &&VD_SCHEMA..VD_SEQ_TARGET');

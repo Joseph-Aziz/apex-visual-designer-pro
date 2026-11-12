@@ -1,16 +1,16 @@
 -- APEX Visual Designer - PKG_VD_DESIGN_API (target application check)
--- Installed by database/install.sql into the schema &&VD_SCHEMA.
+-- Installed by database/install.sql into the schema that runs it.
 
 -- The designers only work on applications registered as active targets in
 -- VD_TARGET_APPLICATIONS for the current APEX workspace.
 
-CREATE OR REPLACE PACKAGE &&VD_SCHEMA..PKG_VD_DESIGN_API AUTHID DEFINER AS
+CREATE OR REPLACE PACKAGE PKG_VD_DESIGN_API AUTHID DEFINER AS
   -- Raises ORA-20215 unless p_app_id is an active target of the current workspace.
   PROCEDURE assert_target_app(p_app_id IN NUMBER);
 END PKG_VD_DESIGN_API;
 /
 
-CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_DESIGN_API AS
+CREATE OR REPLACE PACKAGE BODY PKG_VD_DESIGN_API AS
 
   FUNCTION current_workspace RETURN NUMBER IS
     l_workspace NUMBER;
@@ -30,7 +30,7 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_DESIGN_API AS
   BEGIN
     SELECT COUNT(*)
       INTO l_count
-      FROM &&VD_SCHEMA..VD_TARGET_APPLICATIONS t
+      FROM VD_TARGET_APPLICATIONS t
      WHERE t.WORKSPACE_ID = l_workspace
        AND t.APP_ID = p_app_id
        AND t.IS_ACTIVE = 'Y';

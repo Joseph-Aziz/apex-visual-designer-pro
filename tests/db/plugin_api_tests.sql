@@ -1,6 +1,6 @@
 -- PKG_VD_PLUGIN and register_target checks.
 -- Parameters: @plugin_api_tests.sql VD_SCHEMA TEST_APP
--- Run as the host schema in an APEX SQL Workshop session after install.sql and host_setup.sql.
+-- Run as the host schema in an APEX SQL Workshop session after install.sql and host_setup.sql (or after the plug-in installed itself).
 SET DEFINE ON
 SET VERIFY OFF
 SET SERVEROUTPUT ON
@@ -17,8 +17,8 @@ DECLARE
   END;
 BEGIN
   -- empty scheme = App Builder developers only (a SQL Workshop session may or may not count)
-  ok('empty scheme follows the builder session rule', VD_DESIGNER_API.allowed(NULL) = l_builder);
-  ok('unknown scheme is refused', NOT VD_DESIGNER_API.allowed('No such scheme ' || SYS_GUID()));
+  ok('empty scheme follows the builder session rule', PKG_VD_PLUGIN.allowed(NULL) = l_builder);
+  ok('unknown scheme is refused', NOT PKG_VD_PLUGIN.allowed('No such scheme ' || SYS_GUID()));
   -- the host schema reaches registration only through the package, never the table
   BEGIN
     &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(&&TEST_APP);

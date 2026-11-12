@@ -1,7 +1,7 @@
 -- APEX Visual Designer - PKG_VD_PAGE_WRITER (runs as the calling app schema)
--- Installed by database/install.sql into the schema &&VD_SCHEMA.
+-- Installed by database/install.sql into the schema that runs it.
 
-CREATE OR REPLACE PACKAGE &&VD_SCHEMA..PKG_VD_PAGE_WRITER AUTHID CURRENT_USER AS
+CREATE OR REPLACE PACKAGE PKG_VD_PAGE_WRITER AUTHID CURRENT_USER AS
   -- Current Inline CSS and Execute when Page Loads JS of a page.
   PROCEDURE read_code(p_app IN NUMBER, p_page IN NUMBER, p_css OUT CLOB, p_js OUT CLOB);
 
@@ -41,10 +41,10 @@ CREATE OR REPLACE PACKAGE &&VD_SCHEMA..PKG_VD_PAGE_WRITER AUTHID CURRENT_USER AS
 END PKG_VD_PAGE_WRITER;
 /
 
-CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PAGE_WRITER AS
+CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
   PROCEDURE guard(p_app IN NUMBER, p_page IN NUMBER) IS
   BEGIN
-    &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(p_app);
+    PKG_VD_DESIGN_API.assert_target_app(p_app);
     IF p_page IS NULL OR p_page < 0 THEN
       RAISE_APPLICATION_ERROR(-20233, 'A page number is required.');
     END IF;
@@ -56,7 +56,7 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PAGE_WRITER AS
 
   PROCEDURE read_code(p_app IN NUMBER, p_page IN NUMBER, p_css OUT CLOB, p_js OUT CLOB) IS
   BEGIN
-    &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(p_app);
+    PKG_VD_DESIGN_API.assert_target_app(p_app);
     EXECUTE IMMEDIATE
       'SELECT INLINE_CSS, JAVASCRIPT_CODE_ONLOAD FROM APEX_APPLICATION_PAGES WHERE APPLICATION_ID = :a AND PAGE_ID = :p'
       INTO p_css, p_js USING p_app, p_page;
@@ -172,17 +172,17 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PAGE_WRITER AS
   BEGIN
     guard(p_app, p_page);
     read_code(p_app, p_page, l_css, l_js);
-    IF p_token IS NULL OR p_token <> &&VD_SCHEMA..PKG_VD_PAGE_CODE.code_token(l_css, l_js) THEN
+    IF p_token IS NULL OR p_token <> PKG_VD_PAGE_CODE.code_token(l_css, l_js) THEN
       RAISE_APPLICATION_ERROR(-20230, 'Page changed since it was opened. Reload it in the designer and try again.');
     END IF;
-    l_new_css := &&VD_SCHEMA..PKG_VD_PAGE_CODE.merge_block(l_css, p_css_block);
-    l_new_js  := &&VD_SCHEMA..PKG_VD_PAGE_CODE.merge_block(l_js, p_js_block);
-    IF &&VD_SCHEMA..PKG_VD_PAGE_CODE.version_count(p_app, p_page) = 0 THEN
-      l_id := &&VD_SCHEMA..PKG_VD_PAGE_CODE.add_version(p_app, p_page, l_css, l_js, NULL, 'ORIGINAL');
+    l_new_css := PKG_VD_PAGE_CODE.merge_block(l_css, p_css_block);
+    l_new_js  := PKG_VD_PAGE_CODE.merge_block(l_js, p_js_block);
+    IF PKG_VD_PAGE_CODE.version_count(p_app, p_page) = 0 THEN
+      l_id := PKG_VD_PAGE_CODE.add_version(p_app, p_page, l_css, l_js, NULL, 'ORIGINAL');
     END IF;
     write_code(p_app, p_page, l_new_css, l_new_js);
-    l_id := &&VD_SCHEMA..PKG_VD_PAGE_CODE.add_version(p_app, p_page, l_new_css, l_new_js, p_design, 'SAVED');
-    RETURN &&VD_SCHEMA..PKG_VD_PAGE_CODE.code_token(l_new_css, l_new_js);
+    l_id := PKG_VD_PAGE_CODE.add_version(p_app, p_page, l_new_css, l_new_js, p_design, 'SAVED');
+    RETURN PKG_VD_PAGE_CODE.code_token(l_new_css, l_new_js);
   END save_design;
 
   FUNCTION restore_version(p_app IN NUMBER, p_page IN NUMBER, p_token IN VARCHAR2,
@@ -192,18 +192,18 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PAGE_WRITER AS
   BEGIN
     guard(p_app, p_page);
     read_code(p_app, p_page, l_css, l_js);
-    IF p_token IS NULL OR p_token <> &&VD_SCHEMA..PKG_VD_PAGE_CODE.code_token(l_css, l_js) THEN
+    IF p_token IS NULL OR p_token <> PKG_VD_PAGE_CODE.code_token(l_css, l_js) THEN
       RAISE_APPLICATION_ERROR(-20230, 'Page changed since it was opened. Reload it in the designer and try again.');
     END IF;
-    &&VD_SCHEMA..PKG_VD_PAGE_CODE.get_version(p_version_id, p_app, p_page, l_v_css, l_v_js, l_v_design);
-    &&VD_SCHEMA..PKG_VD_PAGE_CODE.get_latest(p_app, p_page, l_last_id, l_last_css, l_last_js, l_last_design);
-    IF l_last_id IS NULL OR &&VD_SCHEMA..PKG_VD_PAGE_CODE.code_token(l_last_css, l_last_js)
-                            <> &&VD_SCHEMA..PKG_VD_PAGE_CODE.code_token(l_css, l_js) THEN
-      l_id := &&VD_SCHEMA..PKG_VD_PAGE_CODE.add_version(p_app, p_page, l_css, l_js, NULL, 'EDITED OUTSIDE');
+    PKG_VD_PAGE_CODE.get_version(p_version_id, p_app, p_page, l_v_css, l_v_js, l_v_design);
+    PKG_VD_PAGE_CODE.get_latest(p_app, p_page, l_last_id, l_last_css, l_last_js, l_last_design);
+    IF l_last_id IS NULL OR PKG_VD_PAGE_CODE.code_token(l_last_css, l_last_js)
+                            <> PKG_VD_PAGE_CODE.code_token(l_css, l_js) THEN
+      l_id := PKG_VD_PAGE_CODE.add_version(p_app, p_page, l_css, l_js, NULL, 'EDITED OUTSIDE');
     END IF;
     write_code(p_app, p_page, l_v_css, l_v_js);
-    l_id := &&VD_SCHEMA..PKG_VD_PAGE_CODE.add_version(p_app, p_page, l_v_css, l_v_js, l_v_design, 'RESTORED');
-    RETURN &&VD_SCHEMA..PKG_VD_PAGE_CODE.code_token(l_v_css, l_v_js);
+    l_id := PKG_VD_PAGE_CODE.add_version(p_app, p_page, l_v_css, l_v_js, l_v_design, 'RESTORED');
+    RETURN PKG_VD_PAGE_CODE.code_token(l_v_css, l_v_js);
   END restore_version;
 
   PROCEDURE set_static_id(p_app IN NUMBER, p_page IN NUMBER, p_kind IN VARCHAR2,
@@ -395,7 +395,7 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PAGE_WRITER AS
     l_id NUMBER;
   BEGIN
     guard(p_app, 0);
-    l_id := &&VD_SCHEMA..PKG_VD_THEME.add_version(p_app, p_theme, p_css, p_js, 'PUSHED');
+    l_id := PKG_VD_THEME.add_version(p_app, p_theme, p_css, p_js, 'PUSHED');
     apply_theme(p_app, l_id, p_css, p_js);
     RETURN l_id;
   END push_theme;
@@ -404,8 +404,8 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PAGE_WRITER AS
     l_theme CLOB; l_css CLOB; l_js CLOB; l_id NUMBER;
   BEGIN
     guard(p_app, 0);
-    &&VD_SCHEMA..PKG_VD_THEME.get_pushed(p_app, p_version_id, l_theme, l_css, l_js);
-    l_id := &&VD_SCHEMA..PKG_VD_THEME.add_version(p_app, l_theme, l_css, l_js, 'RESTORED');
+    PKG_VD_THEME.get_pushed(p_app, p_version_id, l_theme, l_css, l_js);
+    l_id := PKG_VD_THEME.add_version(p_app, l_theme, l_css, l_js, 'RESTORED');
     apply_theme(p_app, l_id, l_css, l_js);
     RETURN l_id;
   END restore_theme;

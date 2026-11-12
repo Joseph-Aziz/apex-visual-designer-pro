@@ -1,7 +1,7 @@
 -- APEX Visual Designer - PKG_VD_THEME
--- Installed by database/install.sql into the schema &&VD_SCHEMA.
+-- Installed by database/install.sql into the schema that runs it.
 
-CREATE OR REPLACE PACKAGE &&VD_SCHEMA..PKG_VD_THEME AUTHID DEFINER AS
+CREATE OR REPLACE PACKAGE PKG_VD_THEME AUTHID DEFINER AS
   -- Adds a version (p_note DRAFT, PUSHED or RESTORED) and returns its id.
   -- Raises -20240 when p_theme is not a JSON object.
   FUNCTION add_version(p_app IN NUMBER, p_theme IN CLOB, p_css IN CLOB, p_js IN CLOB,
@@ -21,7 +21,7 @@ CREATE OR REPLACE PACKAGE &&VD_SCHEMA..PKG_VD_THEME AUTHID DEFINER AS
 END PKG_VD_THEME;
 /
 
-CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_THEME AS
+CREATE OR REPLACE PACKAGE BODY PKG_VD_THEME AS
   FUNCTION workspace RETURN NUMBER IS
   BEGIN
     RETURN APEX_APPLICATION.GET_SECURITY_GROUP_ID;
@@ -39,12 +39,12 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_THEME AS
     l_ws NUMBER := workspace;
     l_by VARCHAR2(128) := actor;
   BEGIN
-    &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(p_app);
+    PKG_VD_DESIGN_API.assert_target_app(p_app);
     SELECT COUNT(*) INTO l_ok FROM DUAL WHERE p_theme IS JSON AND LTRIM(DBMS_LOB.SUBSTR(p_theme, 20, 1)) LIKE '{%';
     IF p_theme IS NULL OR l_ok = 0 THEN
       RAISE_APPLICATION_ERROR(-20240, 'The theme is not valid. Reload the Theme Designer and try again.');
     END IF;
-    INSERT INTO &&VD_SCHEMA..VD_THEME_VERSIONS (WORKSPACE_ID, APP_ID, THEME_JSON, CSS, JS, NOTE, SAVED_BY)
+    INSERT INTO VD_THEME_VERSIONS (WORKSPACE_ID, APP_ID, THEME_JSON, CSS, JS, NOTE, SAVED_BY)
     VALUES (l_ws, p_app, p_theme, p_css, p_js, p_note, l_by)
     RETURNING VERSION_ID INTO l_id;
     RETURN l_id;
@@ -54,10 +54,10 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_THEME AS
                        p_theme OUT CLOB, p_css OUT CLOB, p_js OUT CLOB, p_note OUT VARCHAR2) IS
     l_ws NUMBER := workspace;
   BEGIN
-    &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(p_app);
+    PKG_VD_DESIGN_API.assert_target_app(p_app);
     SELECT VERSION_ID, THEME_JSON, CSS, JS, NOTE
       INTO p_version_id, p_theme, p_css, p_js, p_note
-      FROM &&VD_SCHEMA..VD_THEME_VERSIONS
+      FROM VD_THEME_VERSIONS
      WHERE WORKSPACE_ID = l_ws AND APP_ID = p_app
        AND (p_pushed_only = 'N' OR NOTE IN ('PUSHED', 'RESTORED'))
      ORDER BY VERSION_ID DESC
@@ -70,9 +70,9 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_THEME AS
                        p_theme OUT CLOB, p_css OUT CLOB, p_js OUT CLOB) IS
     l_ws NUMBER := workspace;
   BEGIN
-    &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(p_app);
+    PKG_VD_DESIGN_API.assert_target_app(p_app);
     SELECT THEME_JSON, CSS, JS INTO p_theme, p_css, p_js
-      FROM &&VD_SCHEMA..VD_THEME_VERSIONS
+      FROM VD_THEME_VERSIONS
      WHERE VERSION_ID = p_version_id AND WORKSPACE_ID = l_ws AND APP_ID = p_app
        AND NOTE IN ('PUSHED', 'RESTORED');
   EXCEPTION
@@ -84,10 +84,10 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_THEME AS
     l_cur SYS_REFCURSOR;
     l_ws NUMBER := workspace;
   BEGIN
-    &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(p_app);
+    PKG_VD_DESIGN_API.assert_target_app(p_app);
     OPEN l_cur FOR
       SELECT VERSION_ID, NOTE, SAVED_BY, SAVED_AT
-        FROM &&VD_SCHEMA..VD_THEME_VERSIONS
+        FROM VD_THEME_VERSIONS
        WHERE WORKSPACE_ID = l_ws AND APP_ID = p_app
        ORDER BY VERSION_ID DESC;
     RETURN l_cur;

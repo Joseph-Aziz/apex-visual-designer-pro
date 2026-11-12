@@ -1,7 +1,7 @@
 -- APEX Visual Designer - PKG_VD_PAGE_CODE
--- Installed by database/install.sql into the schema &&VD_SCHEMA.
+-- Installed by database/install.sql into the schema that runs it.
 
-CREATE OR REPLACE PACKAGE &&VD_SCHEMA..PKG_VD_PAGE_CODE AUTHID DEFINER AS
+CREATE OR REPLACE PACKAGE PKG_VD_PAGE_CODE AUTHID DEFINER AS
   c_start CONSTANT VARCHAR2(30) := '/* vd-flutter:start */';
   c_end   CONSTANT VARCHAR2(30) := '/* vd-flutter:end */';
 
@@ -30,7 +30,7 @@ CREATE OR REPLACE PACKAGE &&VD_SCHEMA..PKG_VD_PAGE_CODE AUTHID DEFINER AS
 END PKG_VD_PAGE_CODE;
 /
 
-CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PAGE_CODE AS
+CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_CODE AS
   FUNCTION workspace RETURN NUMBER IS
     l_ws NUMBER := APEX_APPLICATION.GET_SECURITY_GROUP_ID;
   BEGIN
@@ -126,8 +126,8 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PAGE_CODE AS
     l_ws    NUMBER := workspace;
     l_actor VARCHAR2(128) := actor;
   BEGIN
-    &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(p_app);
-    INSERT INTO &&VD_SCHEMA..VD_PAGE_CODE_VERSIONS
+    PKG_VD_DESIGN_API.assert_target_app(p_app);
+    INSERT INTO VD_PAGE_CODE_VERSIONS
       (WORKSPACE_ID, APP_ID, PAGE_ID, INLINE_CSS, JS_ONLOAD, DESIGN_JSON, NOTE, SAVED_BY)
     VALUES (l_ws, p_app, p_page, p_css, p_js, p_design, p_note, l_actor)
     RETURNING VERSION_ID INTO l_id;
@@ -138,8 +138,8 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PAGE_CODE AS
     l_n  NUMBER;
     l_ws NUMBER := workspace;
   BEGIN
-    &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(p_app);
-    SELECT COUNT(*) INTO l_n FROM &&VD_SCHEMA..VD_PAGE_CODE_VERSIONS
+    PKG_VD_DESIGN_API.assert_target_app(p_app);
+    SELECT COUNT(*) INTO l_n FROM VD_PAGE_CODE_VERSIONS
      WHERE WORKSPACE_ID = l_ws AND APP_ID = p_app AND PAGE_ID = p_page;
     RETURN l_n;
   END version_count;
@@ -148,10 +148,10 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PAGE_CODE AS
                        p_css OUT CLOB, p_js OUT CLOB, p_design OUT CLOB) IS
     l_ws NUMBER := workspace;
   BEGIN
-    &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(p_app);
+    PKG_VD_DESIGN_API.assert_target_app(p_app);
     SELECT VERSION_ID, INLINE_CSS, JS_ONLOAD, DESIGN_JSON
       INTO p_version_id, p_css, p_js, p_design
-      FROM &&VD_SCHEMA..VD_PAGE_CODE_VERSIONS
+      FROM VD_PAGE_CODE_VERSIONS
      WHERE WORKSPACE_ID = l_ws AND APP_ID = p_app AND PAGE_ID = p_page
      ORDER BY VERSION_ID DESC
      FETCH FIRST 1 ROW ONLY;
@@ -164,9 +164,9 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PAGE_CODE AS
                         p_css OUT CLOB, p_js OUT CLOB, p_design OUT CLOB) IS
     l_ws NUMBER := workspace;
   BEGIN
-    &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(p_app);
+    PKG_VD_DESIGN_API.assert_target_app(p_app);
     SELECT INLINE_CSS, JS_ONLOAD, DESIGN_JSON INTO p_css, p_js, p_design
-      FROM &&VD_SCHEMA..VD_PAGE_CODE_VERSIONS
+      FROM VD_PAGE_CODE_VERSIONS
      WHERE VERSION_ID = p_version_id AND WORKSPACE_ID = l_ws
        AND APP_ID = p_app AND PAGE_ID = p_page;
   EXCEPTION
@@ -178,10 +178,10 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PAGE_CODE AS
     l_cur SYS_REFCURSOR;
     l_ws  NUMBER := workspace;
   BEGIN
-    &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(p_app);
+    PKG_VD_DESIGN_API.assert_target_app(p_app);
     OPEN l_cur FOR
       SELECT VERSION_ID, NOTE, SAVED_BY, SAVED_AT
-        FROM &&VD_SCHEMA..VD_PAGE_CODE_VERSIONS
+        FROM VD_PAGE_CODE_VERSIONS
        WHERE WORKSPACE_ID = l_ws AND APP_ID = p_app AND PAGE_ID = p_page
        ORDER BY VERSION_ID DESC;
     RETURN l_cur;

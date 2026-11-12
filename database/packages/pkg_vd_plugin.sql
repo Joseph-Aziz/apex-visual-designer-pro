@@ -1,9 +1,9 @@
 -- APEX Visual Designer - PKG_VD_PLUGIN: render and AJAX functions of the region plug-in.
--- Installed by database/install.sql into the schema &&VD_SCHEMA. The host application's parsing
--- schema calls it through the private synonym VD_DESIGNER_API (database/host_setup.sql).
+-- Installed into the host application's parsing schema by the plug-in itself, or into a separate
+-- designer schema by database/install.sql (the host schema then has the synonym PKG_VD_PLUGIN).
 -- Invoker rights: APEX metadata reads and page writes run as the host application's schema.
 
-CREATE OR REPLACE PACKAGE &&VD_SCHEMA..PKG_VD_PLUGIN AUTHID CURRENT_USER AS
+CREATE OR REPLACE PACKAGE PKG_VD_PLUGIN AUTHID CURRENT_USER AS
   -- Region attributes: attribute_01 authorization scheme name (empty = App Builder developers
   -- only), attribute_02 default target application id (empty = the host app), attribute_03
   -- height in pixels (default 800).
@@ -27,7 +27,7 @@ CREATE OR REPLACE PACKAGE &&VD_SCHEMA..PKG_VD_PLUGIN AUTHID CURRENT_USER AS
 END PKG_VD_PLUGIN;
 /
 
-CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
+CREATE OR REPLACE PACKAGE BODY PKG_VD_PLUGIN AS
   -- Release of the editor files; it ends up in the iframe URL as ?v=, with the plug-in's file
   -- prefix (which APEX versions itself) in front of it.
   c_version CONSTANT VARCHAR2(20) := '1.0.2';
@@ -95,7 +95,7 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
       WHEN VALUE_ERROR THEN
         RAISE_APPLICATION_ERROR(-20215, 'Application is not a registered active target.');
     END;
-    &&VD_SCHEMA..pkg_vd_design_api.assert_target_app(l_app);
+    pkg_vd_design_api.assert_target_app(l_app);
 
     apex_json.open_object;
     apex_json.write('success', TRUE);
@@ -195,28 +195,28 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
       WHEN VALUE_ERROR THEN
         RAISE_APPLICATION_ERROR(-20215, 'Application is not a registered active target.');
     END;
-    &&VD_SCHEMA..pkg_vd_design_api.assert_target_app(l_app);
+    pkg_vd_design_api.assert_target_app(l_app);
 
     -- Do all the work first, so a failure never leaves half-written JSON.
     IF l_action = 'read' THEN
-      &&VD_SCHEMA..pkg_vd_page_writer.read_code(l_app, l_page, l_css, l_js);
-      &&VD_SCHEMA..pkg_vd_page_code.get_latest(l_app, l_page, l_vid, l_v_css, l_v_js, l_design);
-      l_token := &&VD_SCHEMA..pkg_vd_page_code.code_token(l_css, l_js);
+      pkg_vd_page_writer.read_code(l_app, l_page, l_css, l_js);
+      pkg_vd_page_code.get_latest(l_app, l_page, l_vid, l_v_css, l_v_js, l_design);
+      l_token := pkg_vd_page_code.code_token(l_css, l_js);
     ELSIF l_action = 'save' THEN
       l_body := JSON_OBJECT_T.parse(apex_application.g_clob_01);
-      l_token := &&VD_SCHEMA..pkg_vd_page_writer.save_design(l_app, l_page, apex_application.g_x04,
+      l_token := pkg_vd_page_writer.save_design(l_app, l_page, apex_application.g_x04,
         l_body.get_object('design').to_clob, l_body.get_clob('css'), l_body.get_clob('js'));
     ELSIF l_action = 'restore' THEN
-      l_token := &&VD_SCHEMA..pkg_vd_page_writer.restore_version(l_app, l_page, apex_application.g_x04,
+      l_token := pkg_vd_page_writer.restore_version(l_app, l_page, apex_application.g_x04,
         TO_NUMBER(apex_application.g_x05));
     ELSIF l_action = 'staticid' THEN
-      &&VD_SCHEMA..pkg_vd_page_writer.set_static_id(l_app, l_page, apex_application.g_x05,
+      pkg_vd_page_writer.set_static_id(l_app, l_page, apex_application.g_x05,
         TO_NUMBER(apex_application.g_x06), apex_application.g_x07);
     ELSIF l_action = 'cssclass' THEN
-      &&VD_SCHEMA..pkg_vd_page_writer.set_css_class(l_app, l_page, apex_application.g_x05,
+      pkg_vd_page_writer.set_css_class(l_app, l_page, apex_application.g_x05,
         TO_NUMBER(apex_application.g_x06), apex_application.g_x07, apex_application.g_x08);
     ELSIF l_action = 'history' THEN
-      l_cur := &&VD_SCHEMA..pkg_vd_page_code.list_versions(l_app, l_page);
+      l_cur := pkg_vd_page_code.list_versions(l_app, l_page);
     ELSE
       RAISE_APPLICATION_ERROR(-20233, 'Unknown designer action.');
     END IF;
@@ -282,24 +282,24 @@ CREATE OR REPLACE PACKAGE BODY &&VD_SCHEMA..PKG_VD_PLUGIN AS
       WHEN VALUE_ERROR THEN
         RAISE_APPLICATION_ERROR(-20215, 'Application is not a registered active target.');
     END;
-    &&VD_SCHEMA..pkg_vd_design_api.assert_target_app(l_app);
+    pkg_vd_design_api.assert_target_app(l_app);
 
     IF l_action = 'read' THEN
-      &&VD_SCHEMA..pkg_vd_theme.get_latest(l_app, 'N', l_id, l_theme, l_css, l_js, l_note);
-      &&VD_SCHEMA..pkg_vd_theme.get_latest(l_app, 'Y', l_p_id, l_p_th, l_p_css, l_p_js, l_p_note);
+      pkg_vd_theme.get_latest(l_app, 'N', l_id, l_theme, l_css, l_js, l_note);
+      pkg_vd_theme.get_latest(l_app, 'Y', l_p_id, l_p_th, l_p_css, l_p_js, l_p_note);
     ELSIF l_action IN ('draft', 'push') THEN
       l_body := JSON_OBJECT_T.parse(apex_application.g_clob_01);
       IF l_action = 'draft' THEN
-        l_id := &&VD_SCHEMA..pkg_vd_theme.add_version(l_app, l_body.get_object('theme').to_clob,
+        l_id := pkg_vd_theme.add_version(l_app, l_body.get_object('theme').to_clob,
           l_body.get_clob('css'), l_body.get_clob('js'), 'DRAFT');
       ELSE
-        l_id := &&VD_SCHEMA..pkg_vd_page_writer.push_theme(l_app, l_body.get_object('theme').to_clob,
+        l_id := pkg_vd_page_writer.push_theme(l_app, l_body.get_object('theme').to_clob,
           l_body.get_clob('css'), l_body.get_clob('js'));
       END IF;
     ELSIF l_action = 'restore' THEN
-      l_id := &&VD_SCHEMA..pkg_vd_page_writer.restore_theme(l_app, TO_NUMBER(apex_application.g_x03));
+      l_id := pkg_vd_page_writer.restore_theme(l_app, TO_NUMBER(apex_application.g_x03));
     ELSIF l_action = 'history' THEN
-      l_cur := &&VD_SCHEMA..pkg_vd_theme.list_versions(l_app);
+      l_cur := pkg_vd_theme.list_versions(l_app);
     ELSE
       RAISE_APPLICATION_ERROR(-20233, 'Unknown designer action.');
     END IF;

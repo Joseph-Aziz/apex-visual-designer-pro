@@ -1,7 +1,7 @@
 -- =============================================================================
 -- APEX Visual Designer - database install
 --
--- Run connected as the designer schema owner (or a DBA), for example in SQLcl:
+-- Run connected as the designer schema owner, for example in SQLcl:
 --   @install.sql VD_DESIGNER MY_APP_SCHEMA
 --   1st argument  VD_SCHEMA    the schema that will hold the designer objects
 --   2nd argument  HOST_SCHEMA  the parsing schema of the application that hosts the
@@ -18,6 +18,7 @@ DEFINE HOST_SCHEMA = '&2'
 
 PROMPT Installing APEX Visual Designer into &&VD_SCHEMA for host schema &&HOST_SCHEMA
 
+@@tables/vd_install.sql
 @@tables/vd_target_applications.sql
 @@tables/vd_page_code_versions.sql
 @@tables/vd_theme_versions.sql
