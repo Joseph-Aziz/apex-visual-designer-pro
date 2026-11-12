@@ -4,7 +4,7 @@
 
 The Flutter Designer styles one page of a registered application, component by component.
 
-1. Enter the application and page, then click **Open page**. The left list shows the page's regions, items and buttons, grouped by type. The centre shows the live page.
+1. Enter the application and page, then click **Open page**. To design another application of the workspace, enter its id and click **Add application** first. The left list shows the page's regions, items and buttons, grouped by type. The centre shows the live page.
 2. Select a component in the list, or click it on the page. Clicking never runs it.
 3. Pick one of the six designs for its type, then adjust its settings:
    - **Basic:** colours, corner radius, padding, font size and weight.

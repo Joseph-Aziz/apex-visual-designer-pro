@@ -1,5 +1,23 @@
 # Clean install checklist
 
+## Quick start (1.1.0)
+
+Follow the quick start in `docs/INSTALL.md` in an application whose parsing schema has no designer objects. Record each result.
+
+Last run: 2026-11-12, APEX 26.2, an existing host application.
+
+| # | Check | Result |
+| --- | --- | --- |
+| Q1 | Import the export; plug-in at 1.1.0 with 13 files | PASS (blocks loaded through SQL Commands) |
+| Q2 | First page view installs: `tests/db/bootstrap_tests.sql` | PASS 6/6 |
+| Q3 | The designer lists the page's components | PASS |
+| Q4 | Add application: own app accepted; an id outside the workspace refused with -20231 | PASS |
+| Q5 | Re-import with the installed version marked old: the next view reinstalls and keeps registrations | PASS |
+| Q6 | Saving with Runtime API Usage off shows the "Allow page edits" message | Not run (needs the owner to change the setting) |
+| Q7 | Import through App Builder's Import wizard from a GitHub download | Owner's clean test |
+
+## Separate designer schema (1.0.x)
+
 Follow `docs/INSTALL.md` exactly in a workspace that has never had the designer, using a new
 designer schema and a new host application. Record each result.
 
