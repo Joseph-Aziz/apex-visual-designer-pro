@@ -139,5 +139,5 @@
 
   function dirty(board) { return changes(board).length > 0; }
 
-  window.VD.layoutModel = { load: load, move: move, setSpan: setSpan, changes: changes, rows: rows, dirty: dirty };
+  window.VD.layoutModel = { load: load, move: move, setSpan: setSpan, changes: changes, rows: rows, dirty: dirty, hasGrid: hasGrid };
 })();

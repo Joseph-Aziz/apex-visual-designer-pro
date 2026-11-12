@@ -7,15 +7,26 @@
   var params = new URLSearchParams(location.search);
   VD.config = { ajax: params.get('ajax'), app: Number(params.get('app')) || null, build: params.get('v') };
 
-  // view name -> module with enter()
+  // view name -> module with enter() and, optionally, leave(onLeave) -> false to stay on the view
   var VIEWS = {
     flutter: function () { return VD.flutterMode; },
-    theme: function () { return VD.themeMode; }
+    theme: function () { return VD.themeMode; },
+    layout: function () { return VD.layoutMode; }
   };
   var DEFAULT_VIEW = 'flutter';
 
+  var current = null;
+
   function route(name) {
     if (!VIEWS[name]) name = DEFAULT_VIEW;
+    if (current && current !== name) {
+      var from = VIEWS[current]();
+      if (from && from.leave && from.leave(function () { route(name); }) === false) {
+        try { history.replaceState(null, '', '#/' + current); } catch (e) { /* hash stays */ }
+        return;
+      }
+    }
+    current = name;
     document.querySelectorAll('[data-view]').forEach(function (b) {
       b.classList.toggle('is-active', b.getAttribute('data-view') === name);
     });

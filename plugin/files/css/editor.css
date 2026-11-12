@@ -937,3 +937,30 @@ textarea.vd-inp{height:auto;padding:7px 8px;line-height:1.5;resize:vertical}
 .th-cls{display:flex;align-items:center;gap:4px}
 .th-cls code{font-family:var(--mono);font-size:11.5px;color:var(--navy)}
 .th-cls input{flex:1;min-width:0}
+
+/* Layout board */
+#layout-host{display:flex;flex-direction:column;height:100%}
+.lb-msg.is-refused{color:var(--danger)}
+.lb-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:12px}
+.lb-board{position:relative;overflow:auto;outline:none}
+.lb-preview{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--surface)}
+.lb-slot{margin:0 0 14px}
+.lb-slot h4{margin:0 0 6px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.lb-slot h4 small{text-transform:none;font-weight:400}
+.lb-container{min-height:34px;padding:4px;border:1px dashed var(--border);border-radius:6px}
+.lb-row{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;margin-bottom:4px}
+.lb-list{display:flex;flex-direction:column;gap:4px;margin-bottom:4px}
+.lb-empty{color:var(--muted);font-size:12px;padding:6px}
+.lb-box{position:relative;min-width:0;padding:4px 8px;border:1px solid var(--border);border-radius:5px;background:var(--surface);cursor:grab}
+.lb-box.lb-region{border-left:3px solid var(--navy)}
+.lb-box.is-changed{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+.lb-box.is-hidden{opacity:.55;border-style:dashed}
+.lb-box.is-selected,.lb-box:focus-visible{outline:2px solid var(--navy);outline-offset:1px}
+.lb-head{display:flex;gap:6px;align-items:baseline;font-size:12.5px;color:var(--text)}
+.lb-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lb-meta{margin-left:auto;color:var(--muted);font-size:11px;white-space:nowrap}
+.lb-box .lb-container{margin-top:4px}
+.lb-handle{position:absolute;top:0;right:-3px;width:6px;height:100%;cursor:ew-resize}
+.vd-dropline{position:absolute;background:var(--navy);pointer-events:none;border-radius:2px;z-index:5}
+.vd-dropline.is-refused{background:var(--danger)}
+@media (max-width:900px){.lb-body{grid-template-columns:1fr}.lb-preview{min-height:320px}}

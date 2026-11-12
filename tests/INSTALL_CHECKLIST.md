@@ -16,6 +16,19 @@ Last run: 2026-11-12, APEX 26.2, an existing host application.
 | Q6 | Saving with Runtime API Usage off shows the "Allow page edits" message | Not run (needs the owner to change the setting) |
 | Q7 | Import through App Builder's Import wizard, then add the region | PASS (after the header fix: the wizard needs plain values in import_begin) |
 
+## Layout board (1.2.0)
+
+Run in an APEX 26.2 application on a scratch page. Apply and Undo apply re-import the page, which signs out the application's users.
+
+| # | Check | Result |
+| --- | --- | --- |
+| M1 | A page with tabs (sub-regions): move a tab region, apply; the page renders | Not run |
+| M2 | A modal dialog page: reorder the buttons region in the Dialog Footer slot (list mode) | Not run |
+| M3 | A page with hidden items: move one, apply | Not run |
+| M4 | Change the page in App Builder, then Apply: refused with the reload message (-20230) | Not run |
+| M5 | Drag a change, switch to the Flutter Designer: asked to apply or discard | Not run |
+| M6 | Undo apply restores the previous layout | Not run |
+
 ## Separate designer schema (1.0.x)
 
 Follow `docs/INSTALL.md` exactly in a workspace that has never had the designer, using a new
