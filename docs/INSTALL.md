@@ -24,7 +24,7 @@ If the install fails, a developer who opens the page from App Builder sees which
 
 Protect the page itself with the same authorization scheme. The server checks the attribute on every call either way.
 
-If saving fails with "Allow page edits: Shared Components > Security Attributes > Runtime API Usage > Modify This Application.", step 2 is missing.
+If saving fails with "Allow page edits: Shared Components > Security Attributes > Runtime API Usage > Modify This Application.", step 2 is missing. If the preview stays blank, step 3 is missing.
 
 ## Designing other applications
 
