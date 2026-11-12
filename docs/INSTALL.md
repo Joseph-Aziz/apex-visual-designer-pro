@@ -35,10 +35,11 @@ If saving fails with "Allow page edits: Shared Components > Security Attributes 
 
 ## Good to know
 
-- **Re-imports sign users out.** Saving a page design, setting a Static ID or class, and pushing a theme all re-import the changed page (page 0 for themes). That ends the signed-in sessions of that application, and users must log in again.
+- **Re-imports sign users out.** Saving a page design, setting a Static ID or class, applying or undoing a layout, and pushing a theme all re-import the changed page (page 0 for themes). That ends the signed-in sessions of that application, and users must log in again.
+- **The Layout Board.** It moves a page's regions and items between slots and regions and changes their order and column span. Nothing changes until Apply, which writes all the changes in one page re-import. Undo apply puts back the layout before the last Apply; the plug-in keeps the last 10 per page. Apply is refused when someone changed the page after the board loaded it: open the page again.
 - **What a pushed theme adds.** A static file `vd-theme.css` (plus `vd-theme.js` when a style needs it), and a region with static id `vd-theme-link` on page 0. Nothing else on page 0 changes.
 - **Objects the plug-in creates** in the parsing schema:
-  - the tables `VD_INSTALL`, `VD_TARGET_APPLICATIONS`, `VD_PAGE_CODE_VERSIONS` and `VD_THEME_VERSIONS`;
+  - the tables `VD_INSTALL`, `VD_TARGET_APPLICATIONS`, `VD_PAGE_CODE_VERSIONS`, `VD_THEME_VERSIONS` and `VD_LAYOUT_VERSIONS`;
   - the sequence `VD_SEQ_TARGET` and its trigger;
   - the packages `PKG_VD_DESIGN_API`, `PKG_VD_PAGE_CODE`, `PKG_VD_THEME`, `PKG_VD_PAGE_WRITER` and `PKG_VD_PLUGIN`.
 
