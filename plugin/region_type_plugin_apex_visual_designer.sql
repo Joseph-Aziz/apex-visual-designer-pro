@@ -11,10 +11,10 @@ begin
 wwv_flow_imp.import_begin (
  p_version_yyyy_mm_dd=>'2026.04.07'
 ,p_release=>'26.2.0'
-,p_default_workspace_id=>apex_application.get_security_group_id
-,p_default_application_id=>nvl(wwv_flow_application_install.get_application_id, v('FB_FLOW_ID'))
+,p_default_workspace_id=>1000
+,p_default_application_id=>100
 ,p_default_id_offset=>0
-,p_default_owner=>nvl(wwv_flow_application_install.get_schema, sys_context('USERENV', 'CURRENT_SCHEMA'))
+,p_default_owner=>'VD_OWNER'
 );
 end;
 /

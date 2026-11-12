@@ -73,7 +73,9 @@ const slashes = SOURCES.reduce((n, f) => n + (fs.readFileSync(path.join(ROOT, 'd
 assert.strictEqual(chunks.length, slashes, 'one chunk per statement');
 
 // importable into any workspace: no environment values, only the import defaults APEX overrides
-assert.ok(!/p_default_workspace_id=>\d/.test(sql), 'workspace comes from the importing session');
+// App Builder's Import wizard reads the header as plain values (ORA-06502 on an expression);
+// the wizard replaces them with the importing workspace, application and schema.
+assert.ok(/,p_default_workspace_id=>\d+\n,p_default_application_id=>\d+\n,p_default_id_offset=>0\n,p_default_owner=>'[A-Z_]+'\n/.test(sql), 'literal header values');
 console.log('build_plugin_test: all passed');
 // review fixes: a peer creating VD_INSTALL first is not an error; invalid packages fail the
 // install; Oracle error detail reaches only developers
