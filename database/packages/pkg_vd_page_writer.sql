@@ -136,6 +136,14 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
       END IF;
       l_pos := l_next + 3;
     END LOOP;
+  EXCEPTION
+    -- APEX refuses page changes from outside App Builder until the target application allows it.
+    WHEN OTHERS THEN
+      IF SQLCODE = -20987 OR INSTR(SQLERRM, 'API call has been prohibited') > 0 THEN
+        RAISE_APPLICATION_ERROR(-20230,
+          'Allow page edits: Shared Components > Security Attributes > Runtime API Usage > Modify This Application.');
+      END IF;
+      RAISE;
   END import_page;
 
   -- Replaces the arguments of the call that starts with p_head in an export

@@ -1,6 +1,6 @@
 /* APEX Visual Designer - server calls. Every call goes to the AJAX handler of the Visual
    Designer region that hosts this editor (VD.config.ajax), with x10 naming the handler part:
-   components (page components), flutter (page designs), theme (app theme). */
+   components (page components), flutter (page designs), theme (app theme), register (add an app). */
 (function () {
   window.VD = window.VD || {};
   var VD = window.VD;
@@ -19,7 +19,7 @@
     return null;
   }
 
-  var PART = { VD_PAGE_COMPONENTS: 'components', VD_FLUTTER: 'flutter', VD_THEME: 'theme' };
+  var PART = { VD_PAGE_COMPONENTS: 'components', VD_FLUTTER: 'flutter', VD_THEME: 'theme', VD_REGISTER: 'register' };
 
   function callProcess(name, data) {
     var api = apexApi(), ajax = VD.config && VD.config.ajax;
@@ -45,12 +45,23 @@
               (response && response.message) || 'The Oracle repository request failed.'));
           });
         } else {
-          Promise.resolve(req).then(resolve, reject);
+          Promise.resolve(req).then(function (response) {
+            if (response && response.success === false) {
+              reject(repoError(response.code || 'VD_REPOSITORY_ERROR', response.message || 'Repository operation failed.'));
+            } else {
+              resolve(response || {});
+            }
+          }, reject);
         }
       } catch (e) {
         reject(repoError('VD_TRANSPORT', e.message));
       }
     });
+  }
+
+  // Lets the designer work on another application of this workspace.
+  function registerApp(appId) {
+    return callProcess('VD_REGISTER', { x01: String(appId) });
   }
 
   function listPageComponents(appId, pageId) {
@@ -115,6 +126,7 @@
     pushTheme: pushTheme,
     themeHistory: themeHistory,
     restoreTheme: restoreTheme,
+    registerApp: registerApp,
     listPageComponents: listPageComponents,
     readFlutter: readFlutter,
     saveFlutter: saveFlutter,

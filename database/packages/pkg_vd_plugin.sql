@@ -11,7 +11,7 @@ CREATE OR REPLACE PACKAGE PKG_VD_PLUGIN AUTHID CURRENT_USER AS
                    p_param IN apex_plugin.t_region_render_param,
                    p_result IN OUT NOCOPY apex_plugin.t_region_render_result);
 
-  -- Every designer call. apex_application.g_x10 names the part: components, flutter, theme.
+  -- Every designer call. apex_application.g_x10 names the part: components, flutter, theme, register.
   PROCEDURE ajax(p_region IN apex_plugin.t_region, p_plugin IN apex_plugin.t_plugin,
                  p_param IN apex_plugin.t_region_ajax_param,
                  p_result IN OUT NOCOPY apex_plugin.t_region_ajax_result);
@@ -83,6 +83,19 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PLUGIN AS
   EXCEPTION
     WHEN OTHERS THEN RETURN FALSE;
   END shares_session;
+
+  -- "Add application": g_x01 is an application of this workspace the designer may work on.
+  PROCEDURE do_register IS
+    l_app NUMBER := TO_NUMBER(apex_application.g_x01 DEFAULT NULL ON CONVERSION ERROR);
+  BEGIN
+    IF l_app IS NULL THEN
+      RAISE_APPLICATION_ERROR(-20233, 'Enter an application number.');
+    END IF;
+    PKG_VD_DESIGN_API.register_app(l_app);
+    apex_json.open_object;
+    apex_json.write('success', TRUE);
+    apex_json.close_object;
+  END do_register;
 
   PROCEDURE do_components IS
   l_app  NUMBER;
@@ -359,6 +372,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PLUGIN AS
       WHEN 'components' THEN do_components;
       WHEN 'flutter' THEN do_flutter;
       WHEN 'theme' THEN do_theme;
+      WHEN 'register' THEN do_register;
       ELSE RAISE_APPLICATION_ERROR(-20233, 'Unknown designer action.');
     END CASE;
   EXCEPTION

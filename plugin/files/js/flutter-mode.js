@@ -200,6 +200,7 @@
       '<span class="lk-spacer"></span>' +
       '<label class="lk-inline">App <input type="number" class="fl-app" value="' + esc(state.app) + '"></label>' +
       '<label class="lk-inline">Page <input type="number" class="fl-page" value="' + esc(state.page || '') + '"></label>' +
+      '<button class="vd-btn vd-btn--ghost fl-add-app" title="Let the designer work on this application">Add application</button>' +
       '<button class="vd-btn vd-btn--secondary fl-attach">Open page</button>' +
       '<button class="vd-btn vd-btn--ghost fl-history"' + (state.page ? '' : ' disabled') + '>History</button>' +
       '<button class="vd-btn vd-btn--primary fl-save"' + (state.page && dirty() && !state.busy ? '' : ' disabled') + '>Save to page</button>';
@@ -208,6 +209,9 @@
       if (!app || !(page >= 0)) { setMessage('Enter an app and page number.'); return; }
       if (dirty() && !window.confirm('Discard unsaved changes on this page?')) return;
       attach(app, page);
+    });
+    top.querySelector('.fl-add-app').addEventListener('click', function () {
+      addApp(Number(top.querySelector('.fl-app').value));
     });
     top.querySelector('.fl-history').addEventListener('click', openHistory);
     top.querySelector('.fl-save').addEventListener('click', save);
@@ -335,6 +339,19 @@
       .catch(function (e) { state.busy = false; setMessage(e.message); renderTop(); });
   }
 
+  // Registers an application of this workspace as a designer target; then reloads the
+  // components of the open page when it belongs to that application.
+  function addApp(app) {
+    if (!app) { setMessage('Enter an application number.'); return Promise.resolve(); }
+    setMessage('Adding application ' + app + '…');
+    return VD.repository.registerApp(app)
+      .then(function () {
+        setMessage('Application ' + app + ' added. Enter a page number and open it.');
+        if (state.page != null && state.app === app) return attach(app, state.page);
+      })
+      .catch(function (e) { setMessage(e.message); });
+  }
+
   function openHistory() {
     var right = host.querySelector('.fl-right');
     right.innerHTML = '<h3>History of page ' + esc(state.page) + '</h3><p class="lk-hint">Loading…</p>';
@@ -368,6 +385,7 @@
       render(!frame);
     },
     attach: attach,
+    addApp: addApp,
     stylesFor: stylesFor,
     currentStyle: currentStyle
   };

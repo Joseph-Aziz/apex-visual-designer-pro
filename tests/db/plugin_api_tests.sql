@@ -30,6 +30,19 @@ BEGIN
     ok('unregistered app refused (no error raised)', FALSE);
   EXCEPTION WHEN OTHERS THEN ok('unregistered app refused', SQLCODE = -20215);
   END;
+  -- "Add application": only applications of this workspace; registering again keeps one row
+  BEGIN
+    &&VD_SCHEMA..PKG_VD_DESIGN_API.register_app(-1);
+    ok('app outside the workspace refused (no error raised)', FALSE);
+  EXCEPTION WHEN OTHERS THEN ok('app outside the workspace refused', SQLCODE = -20231);
+  END;
+  BEGIN
+    &&VD_SCHEMA..PKG_VD_DESIGN_API.register_app(&&TEST_APP);
+    &&VD_SCHEMA..PKG_VD_DESIGN_API.register_app(&&TEST_APP);
+    &&VD_SCHEMA..PKG_VD_DESIGN_API.assert_target_app(&&TEST_APP);
+    ok('registering the test app twice keeps it registered', TRUE);
+  EXCEPTION WHEN OTHERS THEN ok('registering the test app twice (' || SQLERRM || ')', FALSE);
+  END;
   DBMS_OUTPUT.PUT_LINE(l_pass || ' passed, ' || l_fail || ' failed');
 END;
 /
