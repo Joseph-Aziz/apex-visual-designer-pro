@@ -16,7 +16,7 @@
 - Plug-in name stays `COM.APEXVD.VISUAL_DESIGNER`; component ids stay stable (re-import replaces).
 - Release version 1.1.0 (`c_version`, build default, CHANGELOG).
 - Runtime API message, exact copy: "Allow page edits: Shared Components > Security Attributes > Runtime API Usage > Modify This Application."
-- Do not touch app 144, schema HTML_DESIGN, or the old repo. Live tests use a fresh app on a schema the owner names; never install into SHABAB_PUBLIC without the owner's yes.
+- Do not touch the pilot application, its schema, or the old repo. Live tests use the application and schema the owner names.
 - Never enter passwords; the owner logs in.
 - Docs and commits in plain prose; commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 

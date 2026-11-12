@@ -10,8 +10,8 @@ Run on 2026-11-12, APEX 26.2, in SQL Commands as VD_TEST.
 
 Other findings:
 
-- `DBMS_LOCK` is not visible to VD_TEST or SHABAB_PUBLIC. The bootstrap uses the plan's fallback:
+- `DBMS_LOCK` is not visible to the test schemas. The bootstrap uses the plan's fallback:
   create `VD_INSTALL` first, then `LOCK TABLE VD_INSTALL IN EXCLUSIVE MODE`.
-- SHABAB_PUBLIC (app 147) holds CREATE TABLE, CREATE SEQUENCE, CREATE PROCEDURE and CREATE TRIGGER
+- The host app's parsing schema holds CREATE TABLE, CREATE SEQUENCE, CREATE PROCEDURE and CREATE TRIGGER
   directly, and has no object named `VD_%` or `PKG_VD_%` except the old synonym `VD_DESIGNER_API`.
 - The scratch package `VD_SPIKE` was dropped.
