@@ -78,6 +78,14 @@
   function layout(appId, pageId) {
     return flutterCall('layout', appId, pageId).then(function (r) { return r.layout; });
   }
+  // changes: VD.layoutModel.changes(board). -> { token } (the page's new layout token)
+  function applyLayout(appId, pageId, token, changes) {
+    return flutterCall('apply_layout', appId, pageId, { x04: token, p_clob_01: JSON.stringify(changes) });
+  }
+  // Puts back the layout before the newest applied change list. -> { token }
+  function undoLayout(appId, pageId, token) {
+    return flutterCall('undo_layout', appId, pageId, { x04: token });
+  }
   // -> { token, css, js, design? }
   function readFlutter(appId, pageId) { return flutterCall('read', appId, pageId); }
   // -> { token }
@@ -137,6 +145,8 @@
     flutterHistory: flutterHistory,
     restoreFlutter: restoreFlutter,
     setStaticId: setStaticId,
-    layout: layout
+    layout: layout,
+    applyLayout: applyLayout,
+    undoLayout: undoLayout
   };
 })();

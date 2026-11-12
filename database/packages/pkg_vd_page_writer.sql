@@ -38,6 +38,14 @@ CREATE OR REPLACE PACKAGE PKG_VD_PAGE_WRITER AUTHID CURRENT_USER AS
 
   -- Puts a PUSHED or RESTORED version back into the app as a new RESTORED version.
   FUNCTION restore_theme(p_app IN NUMBER, p_version_id IN NUMBER) RETURN NUMBER;
+  -- Layout board: applies a change list (JSON array of {kind, id, slot, parent | region, seq,
+  -- newRow, newCol, colStart, span}) to the page and keeps the old values for undo (10 per page).
+  -- Raises -20230 when p_token is not the page's layout token and -20243 when a change is not valid.
+  -- p_fail_after_import is for the database tests: it fails after the import to prove the rollback.
+  FUNCTION apply_layout(p_app IN NUMBER, p_page IN NUMBER, p_token IN VARCHAR2, p_changes IN CLOB,
+                        p_fail_after_import IN BOOLEAN DEFAULT FALSE) RETURN VARCHAR2;
+  -- Puts back the values before the newest applied change list and forgets it. Returns the new token.
+  FUNCTION undo_layout(p_app IN NUMBER, p_page IN NUMBER, p_token IN VARCHAR2) RETURN VARCHAR2;
 END PKG_VD_PAGE_WRITER;
 /
 
@@ -147,9 +155,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
   END import_page;
 
   -- Replaces the arguments of the call that starts with p_head in an export
-  -- (drops p_drop_1/p_drop_2, then appends p_add). Raises -20234 when it is missing.
-  FUNCTION edit_call(p_src IN CLOB, p_head IN VARCHAR2, p_drop_1 IN VARCHAR2,
-                     p_drop_2 IN VARCHAR2, p_add IN CLOB) RETURN CLOB IS
+  -- (drops every argument named in p_drop, then appends p_add). Raises -20234 when it is missing.
+  FUNCTION edit_call(p_src IN CLOB, p_head IN VARCHAR2, p_drop IN apex_t_varchar2, p_add IN CLOB) RETURN CLOB IS
     l_a    PLS_INTEGER;
     l_b    PLS_INTEGER;
     l_call CLOB;
@@ -160,8 +167,9 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
       RAISE_APPLICATION_ERROR(-20234, 'Page export has an unexpected format; nothing was changed.');
     END IF;
     l_call := SUBSTR(p_src, l_a, l_b - l_a);
-    l_call := drop_arg(l_call, p_drop_1);
-    IF p_drop_2 IS NOT NULL THEN l_call := drop_arg(l_call, p_drop_2); END IF;
+    FOR i IN 1 .. p_drop.COUNT LOOP
+      l_call := drop_arg(l_call, p_drop(i));
+    END LOOP;
     RETURN SUBSTR(p_src, 1, l_a - 1) || l_call || p_add || SUBSTR(p_src, l_b);
   END edit_call;
 
@@ -170,7 +178,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
   BEGIN
     guard(p_app, p_page);
     import_page(edit_call(export_page(p_app, p_page, l_owner), 'wwv_flow_imp_page.create_page(',
-      'p_inline_css', 'p_javascript_code_onload',
+      apex_t_varchar2('p_inline_css', 'p_javascript_code_onload'),
       CHR(10) || ',p_inline_css=>' || literal(p_css) || CHR(10) || ',p_javascript_code_onload=>' || literal(p_js)));
   END write_code;
 
@@ -251,7 +259,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
     END IF;
     import_page(edit_call(export_page(p_app, p_page, l_owner),
       l_head || CHR(10) || ' p_id=>wwv_flow_imp.id(' || TO_CHAR(p_component_id) || ')',
-      l_arg, NULL, CHR(10) || ',' || l_arg || '=>''' || p_static_id || ''''));
+      apex_t_varchar2(l_arg), CHR(10) || ',' || l_arg || '=>''' || p_static_id || ''''));
   END set_static_id;
 
   -- The class list with every vd-<p_type>-* class removed and vd-<p_type>-<p_cls> added.
@@ -299,7 +307,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
     l_classes := with_class(l_classes, p_type, p_cls);
     import_page(edit_call(export_page(p_app, p_page, l_owner),
       l_head || CHR(10) || ' p_id=>wwv_flow_imp.id(' || TO_CHAR(p_component_id) || ')',
-      l_arg, NULL, CASE WHEN l_classes IS NOT NULL THEN CHR(10) || ',' || l_arg || '=>' || literal(l_classes) END));
+      apex_t_varchar2(l_arg), CASE WHEN l_classes IS NOT NULL THEN CHR(10) || ',' || l_arg || '=>' || literal(l_classes) END));
   END set_css_class;
 
   -- The start of an APEX import session for p_app (the page writes run the same way). The
@@ -359,7 +367,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
       INTO l_region USING p_app;
     IF l_region IS NOT NULL THEN
       l_src := edit_call(l_src, 'wwv_flow_imp_page.create_page_plug(' || CHR(10) || ' p_id=>wwv_flow_imp.id(' || TO_CHAR(l_region) || ')',
-        'p_plug_source', NULL, CHR(10) || ',p_plug_source=>' || literal(l_html));
+        apex_t_varchar2('p_plug_source'), CHR(10) || ',p_plug_source=>' || literal(l_html));
     ELSE
       EXECUTE IMMEDIATE 'SELECT MIN(REGION_TEMPLATE_ID) FROM APEX_APPLICATION_TEMP_REGION ' ||
         'WHERE APPLICATION_ID = :a AND TEMPLATE_NAME = ''Blank with Attributes (No Grid)''' INTO l_tpl USING p_app;
@@ -417,5 +425,293 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
     apply_theme(p_app, l_id, l_css, l_js);
     RETURN l_id;
   END restore_theme;
+  -- Layout board ---------------------------------------------------------------------------
+
+  -- Layout arguments of the export calls (confirmed on APEX 26.2, see PKG_VD_PAGE_CODE.layout_json).
+  FUNCTION region_args RETURN apex_t_varchar2 IS
+  BEGIN
+    RETURN apex_t_varchar2('p_plug_display_sequence', 'p_plug_display_point', 'p_parent_plug_id',
+      'p_plug_new_grid_row', 'p_plug_new_grid_column', 'p_plug_display_column', 'p_plug_grid_column_span');
+  END region_args;
+
+  FUNCTION item_args RETURN apex_t_varchar2 IS
+  BEGIN
+    RETURN apex_t_varchar2('p_item_sequence', 'p_item_plug_id', 'p_begin_on_new_line',
+      'p_begin_on_new_field', 'p_grid_column', 'p_colspan');
+  END item_args;
+
+  PROCEDURE refuse(p_reason IN VARCHAR2) IS
+  BEGIN
+    RAISE_APPLICATION_ERROR(-20243, p_reason || ' Nothing was changed.');
+  END refuse;
+
+  -- A whole number from 1 to 12, or null (automatic).
+  FUNCTION column_value(p_obj IN JSON_OBJECT_T, p_key IN VARCHAR2) RETURN NUMBER IS
+    l_n NUMBER;
+  BEGIN
+    IF NOT p_obj.has(p_key) OR p_obj.get(p_key).is_null THEN RETURN NULL; END IF;
+    l_n := p_obj.get_number(p_key);
+    IF l_n IS NULL OR l_n <> TRUNC(l_n) OR l_n NOT BETWEEN 1 AND 12 THEN
+      refuse('A span or column start runs from 1 to 12.');
+    END IF;
+    RETURN l_n;
+  END column_value;
+
+  -- A component id given as text or number; null when absent or not a number.
+  FUNCTION id_value(p_obj IN JSON_OBJECT_T, p_key IN VARCHAR2) RETURN NUMBER IS
+  BEGIN
+    IF NOT p_obj.has(p_key) OR p_obj.get(p_key).is_null THEN RETURN NULL; END IF;
+    RETURN TO_NUMBER(p_obj.get_string(p_key) DEFAULT NULL ON CONVERSION ERROR);
+  END id_value;
+
+  -- Merges p_changes into the page's current layout (p_state), checks the result and returns the
+  -- old values of the changed components, as change objects, for undo.
+  FUNCTION merge_layout(p_state IN OUT NOCOPY JSON_OBJECT_T, p_changes IN JSON_ARRAY_T) RETURN JSON_ARRAY_T IS
+    l_old     JSON_ARRAY_T := JSON_ARRAY_T();
+    l_list    JSON_ARRAY_T;
+    l_ch      JSON_OBJECT_T;
+    l_comp    JSON_OBJECT_T;
+    l_prev    JSON_OBJECT_T;
+    l_kind    VARCHAR2(10);
+    l_id      VARCHAR2(40);
+    l_ref     NUMBER;
+    l_found   BOOLEAN;
+    l_changed apex_t_varchar2 := apex_t_varchar2();
+    l_state   CLOB;
+    l_reason  VARCHAR2(200);
+  BEGIN
+    FOR i IN 0 .. p_changes.get_size - 1 LOOP
+      IF NOT p_changes.get(i).is_object THEN refuse('A change is not valid.'); END IF;
+      l_ch := TREAT(p_changes.get(i) AS JSON_OBJECT_T);
+      l_kind := l_ch.get_string('kind');
+      l_id := TO_CHAR(id_value(l_ch, 'id'));
+      IF l_kind IS NULL OR l_kind NOT IN ('region', 'item') OR l_id IS NULL THEN refuse('A change is not valid.'); END IF;
+      IF NOT l_ch.has('seq') OR l_ch.get_number('seq') IS NULL OR l_ch.get_number('seq') < 0 THEN
+        refuse('A change is not valid.');
+      END IF;
+      IF l_kind || ':' || l_id MEMBER OF l_changed THEN refuse('A component is listed twice.'); END IF;
+      l_list := p_state.get_array(l_kind || 's');
+      l_found := FALSE;
+      FOR j IN 0 .. l_list.get_size - 1 LOOP
+        l_comp := TREAT(l_list.get(j) AS JSON_OBJECT_T);
+        IF l_comp.get_string('id') = l_id THEN
+          l_found := TRUE;
+          l_prev := JSON_OBJECT_T();
+          l_prev.put('kind', l_kind);
+          l_prev.put('id', l_id);
+          IF l_kind = 'region' THEN
+            l_prev.put('parent', l_comp.get('parent'));
+            l_prev.put('slot', l_comp.get('slot'));
+            l_ref := id_value(l_ch, 'parent');
+            IF l_ref IS NULL AND l_ch.has('parent') AND NOT l_ch.get('parent').is_null THEN
+              refuse('That region is not on this page.');
+            END IF;
+            IF l_ref IS NULL THEN
+              l_comp.put_null('parent');
+              l_comp.put('slot', l_ch.get_string('slot'));
+            ELSE
+              l_comp.put('parent', TO_CHAR(l_ref));
+              l_comp.put('slot', 'SUB_REGIONS');
+            END IF;
+          ELSE
+            l_prev.put('region', l_comp.get('region'));
+            l_ref := id_value(l_ch, 'region');
+            IF l_ref IS NULL THEN refuse('An item must be inside a region.'); END IF;
+            l_comp.put('region', TO_CHAR(l_ref));
+          END IF;
+          l_prev.put('seq', l_comp.get('seq'));
+          l_prev.put('newRow', l_comp.get('newRow'));
+          l_prev.put('newCol', l_comp.get('newCol'));
+          l_prev.put('colStart', l_comp.get('colStart'));
+          l_prev.put('span', l_comp.get('span'));
+          l_old.append(l_prev);
+          l_comp.put('seq', l_ch.get_number('seq'));
+          l_comp.put('newRow', CASE WHEN l_ch.has('newRow') AND l_ch.get('newRow').is_false THEN FALSE ELSE TRUE END);
+          l_comp.put('newCol', CASE WHEN l_ch.has('newCol') AND l_ch.get('newCol').is_false THEN FALSE ELSE TRUE END);
+          IF column_value(l_ch, 'colStart') IS NULL THEN l_comp.put_null('colStart');
+          ELSE l_comp.put('colStart', column_value(l_ch, 'colStart')); END IF;
+          IF column_value(l_ch, 'span') IS NULL THEN l_comp.put_null('span');
+          ELSE l_comp.put('span', column_value(l_ch, 'span')); END IF;
+          l_changed.EXTEND; l_changed(l_changed.COUNT) := l_kind || ':' || l_id;
+          EXIT;
+        END IF;
+      END LOOP;
+      IF NOT l_found THEN refuse('That ' || l_kind || ' is not on this page.'); END IF;
+    END LOOP;
+
+    -- Check the merged page: slots, parents, no region inside itself, 12-column rows.
+    l_state := p_state.to_clob;
+    WITH slots AS (
+      SELECT name, grid FROM JSON_TABLE(l_state, '$.slots[*]' COLUMNS (
+        name VARCHAR2(255) PATH '$.name', grid VARCHAR2(5) PATH '$.grid'))
+    ), r AS (
+      SELECT * FROM JSON_TABLE(l_state, '$.regions[*]' COLUMNS (
+        id VARCHAR2(40) PATH '$.id', parent VARCHAR2(40) PATH '$.parent', slot VARCHAR2(255) PATH '$.slot',
+        seq NUMBER PATH '$.seq', new_row VARCHAR2(5) PATH '$.newRow', span NUMBER PATH '$.span'))
+    ), i AS (
+      SELECT * FROM JSON_TABLE(l_state, '$.items[*]' COLUMNS (
+        id VARCHAR2(40) PATH '$.id', region VARCHAR2(40) PATH '$.region',
+        seq NUMBER PATH '$.seq', new_row VARCHAR2(5) PATH '$.newRow', span NUMBER PATH '$.span'))
+    ), changed AS (
+      SELECT column_value k FROM TABLE(l_changed)
+    ), cyc AS (
+      SELECT MAX(CONNECT_BY_ISCYCLE) c FROM r
+       START WITH 'region:' || id IN (SELECT k FROM changed)
+       CONNECT BY NOCYCLE id = PRIOR parent
+    ), roots AS (
+      SELECT id, CONNECT_BY_ROOT slot root_slot FROM r
+       START WITH parent IS NULL CONNECT BY NOCYCLE parent = PRIOR id
+    ), comps AS (
+      SELECT 'region:' || r.id k, 'region' kind,
+             CASE WHEN r.parent IS NULL THEN 'slot:' || r.slot ELSE 'region:' || r.parent END cont,
+             r.seq, r.new_row, r.span FROM r
+      UNION ALL
+      SELECT 'item:' || i.id, 'item', 'region:' || i.region, i.seq, i.new_row, i.span FROM i
+    ), grid AS (
+      SELECT DISTINCT c.cont FROM comps c
+        LEFT JOIN roots ro ON c.cont = 'region:' || ro.id
+        JOIN slots s ON s.name = CASE WHEN c.cont LIKE 'slot:%' THEN SUBSTR(c.cont, 6) ELSE ro.root_slot END
+       WHERE s.grid = 'true' AND c.cont IN (SELECT c2.cont FROM comps c2 JOIN changed ON changed.k = c2.k)
+    ), numbered AS (
+      SELECT c.cont, c.kind, c.span,
+             SUM(CASE WHEN c.new_row = 'false' THEN 0 ELSE 1 END)
+               OVER (PARTITION BY c.cont, c.kind ORDER BY c.seq, c.k ROWS UNBOUNDED PRECEDING) row_no
+        FROM comps c JOIN grid g ON g.cont = c.cont
+    )
+    SELECT CASE
+      WHEN EXISTS (SELECT 1 FROM r JOIN changed ON changed.k = 'region:' || r.id
+                    WHERE r.parent IS NULL AND (r.slot IS NULL OR r.slot NOT IN (SELECT name FROM slots)))
+        THEN 'The page template has no such slot.'
+      WHEN EXISTS (SELECT 1 FROM r JOIN changed ON changed.k = 'region:' || r.id
+                    WHERE r.parent IS NOT NULL AND r.parent NOT IN (SELECT id FROM r))
+        THEN 'That region is not on this page.'
+      WHEN (SELECT c FROM cyc) = 1 OR EXISTS (SELECT 1 FROM r WHERE r.parent = r.id)
+        THEN 'A region cannot go inside itself.'
+      WHEN EXISTS (SELECT 1 FROM i JOIN changed ON changed.k = 'item:' || i.id
+                    WHERE i.region NOT IN (SELECT id FROM r))
+        THEN 'An item must be inside a region.'
+      WHEN EXISTS (SELECT 1 FROM numbered GROUP BY cont, kind, row_no HAVING SUM(NVL(span, 0)) > 12)
+        THEN 'A row cannot be wider than 12 columns.'
+      END
+      INTO l_reason FROM DUAL;
+    IF l_reason IS NOT NULL THEN refuse(l_reason); END IF;
+    RETURN l_old;
+  END merge_layout;
+
+  -- The export with the layout arguments of each listed component replaced by its new values.
+  FUNCTION layout_source(p_src IN CLOB, p_comps IN JSON_ARRAY_T) RETURN CLOB IS
+    l_src  CLOB := p_src;
+    l_c    JSON_OBJECT_T;
+    l_add  VARCHAR2(4000);
+    l_slot VARCHAR2(255);
+    FUNCTION num(p_key IN VARCHAR2) RETURN VARCHAR2 IS
+    BEGIN
+      RETURN CASE WHEN l_c.has(p_key) AND NOT l_c.get(p_key).is_null THEN TO_CHAR(l_c.get_number(p_key)) END;
+    END num;
+    FUNCTION is_false(p_key IN VARCHAR2) RETURN BOOLEAN IS
+    BEGIN
+      RETURN l_c.has(p_key) AND l_c.get(p_key).is_false;
+    END is_false;
+  BEGIN
+    FOR i IN 0 .. p_comps.get_size - 1 LOOP
+      l_c := TREAT(p_comps.get(i) AS JSON_OBJECT_T);
+      IF l_c.get_string('kind') = 'region' THEN
+        l_slot := CASE WHEN id_value(l_c, 'parent') IS NOT NULL THEN 'SUB_REGIONS' ELSE l_c.get_string('slot') END;
+        IF NOT REGEXP_LIKE(l_slot, '^[A-Za-z0-9_]{1,255}$') THEN refuse('The page template has no such slot.'); END IF;
+        l_add := CHR(10) || ',p_plug_display_sequence=>' || num('seq')
+          || CHR(10) || ',p_plug_display_point=>''' || l_slot || ''''
+          || CASE WHEN id_value(l_c, 'parent') IS NOT NULL
+                  THEN CHR(10) || ',p_parent_plug_id=>wwv_flow_imp.id(' || id_value(l_c, 'parent') || ')' END
+          || CASE WHEN is_false('newRow') THEN CHR(10) || ',p_plug_new_grid_row=>false' END
+          || CASE WHEN is_false('newCol') THEN CHR(10) || ',p_plug_new_grid_column=>false' END
+          || CASE WHEN num('colStart') IS NOT NULL THEN CHR(10) || ',p_plug_display_column=>' || num('colStart') END
+          || CASE WHEN num('span') IS NOT NULL THEN CHR(10) || ',p_plug_grid_column_span=>' || num('span') END;
+        l_src := edit_call(l_src, 'wwv_flow_imp_page.create_page_plug(' || CHR(10)
+          || ' p_id=>wwv_flow_imp.id(' || id_value(l_c, 'id') || ')', region_args, l_add);
+      ELSE
+        l_add := CHR(10) || ',p_item_sequence=>' || num('seq')
+          || CHR(10) || ',p_item_plug_id=>wwv_flow_imp.id(' || id_value(l_c, 'region') || ')'
+          || CASE WHEN is_false('newRow') THEN CHR(10) || ',p_begin_on_new_line=>''N''' END
+          || CASE WHEN is_false('newCol') THEN CHR(10) || ',p_begin_on_new_field=>''N''' END
+          || CASE WHEN num('colStart') IS NOT NULL THEN CHR(10) || ',p_grid_column=>' || num('colStart') END
+          || CASE WHEN num('span') IS NOT NULL THEN CHR(10) || ',p_colspan=>' || num('span') END;
+        l_src := edit_call(l_src, 'wwv_flow_imp_page.create_page_item(' || CHR(10)
+          || ' p_id=>wwv_flow_imp.id(' || id_value(l_c, 'id') || ')', item_args, l_add);
+      END IF;
+    END LOOP;
+    RETURN l_src;
+  END layout_source;
+
+  -- Checks the token, merges and checks the changes and writes the page once; when the import
+  -- fails the original export is imported again. Returns the old values of the changed components.
+  FUNCTION write_layout(p_app IN NUMBER, p_page IN NUMBER, p_token IN VARCHAR2, p_changes IN CLOB,
+                        p_fail_after_import IN BOOLEAN) RETURN JSON_ARRAY_T IS
+    l_state   JSON_OBJECT_T;
+    l_changes JSON_ARRAY_T;
+    l_old     JSON_ARRAY_T;
+    l_owner   VARCHAR2(128);
+    l_src     CLOB;
+  BEGIN
+    guard(p_app, p_page);
+    IF p_token IS NULL OR p_token <> PKG_VD_PAGE_CODE.layout_token(p_app, p_page) THEN
+      RAISE_APPLICATION_ERROR(-20230, 'Page changed since it was opened. Reload it in the designer and try again.');
+    END IF;
+    BEGIN
+      l_changes := JSON_ARRAY_T.parse(p_changes);
+    EXCEPTION
+      WHEN OTHERS THEN refuse('A change is not valid.');
+    END;
+    IF l_changes IS NULL OR l_changes.get_size = 0 THEN refuse('There are no changes.'); END IF;
+    l_state := JSON_OBJECT_T.parse(PKG_VD_PAGE_CODE.layout_json(p_app, p_page));
+    l_old := merge_layout(l_state, l_changes);
+    l_src := export_page(p_app, p_page, l_owner);
+    BEGIN
+      import_page(layout_source(l_src, l_changes));
+      IF p_fail_after_import THEN RAISE_APPLICATION_ERROR(-20234, 'Test failure after the import.'); END IF;
+    EXCEPTION
+      WHEN OTHERS THEN
+        import_page(l_src);
+        RAISE;
+    END;
+    RETURN l_old;
+  END write_layout;
+
+  FUNCTION apply_layout(p_app IN NUMBER, p_page IN NUMBER, p_token IN VARCHAR2, p_changes IN CLOB,
+                        p_fail_after_import IN BOOLEAN DEFAULT FALSE) RETURN VARCHAR2 IS
+    l_old JSON_ARRAY_T;
+    l_ws  NUMBER := APEX_APPLICATION.GET_SECURITY_GROUP_ID;
+  BEGIN
+    l_old := write_layout(p_app, p_page, p_token, p_changes, p_fail_after_import);
+    INSERT INTO VD_LAYOUT_VERSIONS (WORKSPACE_ID, APP_ID, PAGE_ID, CHANGES, SAVED_BY)
+    VALUES (l_ws, p_app, p_page, l_old.to_clob,
+            COALESCE(SYS_CONTEXT('APEX$SESSION', 'APP_USER'), SYS_CONTEXT('USERENV', 'SESSION_USER')));
+    DELETE FROM VD_LAYOUT_VERSIONS
+     WHERE WORKSPACE_ID = l_ws AND APP_ID = p_app AND PAGE_ID = p_page
+       AND VERSION_ID NOT IN (SELECT VERSION_ID FROM VD_LAYOUT_VERSIONS
+                               WHERE WORKSPACE_ID = l_ws AND APP_ID = p_app AND PAGE_ID = p_page
+                               ORDER BY VERSION_ID DESC FETCH FIRST 10 ROWS ONLY);
+    RETURN PKG_VD_PAGE_CODE.layout_token(p_app, p_page);
+  END apply_layout;
+
+  FUNCTION undo_layout(p_app IN NUMBER, p_page IN NUMBER, p_token IN VARCHAR2) RETURN VARCHAR2 IS
+    l_ws  NUMBER := APEX_APPLICATION.GET_SECURITY_GROUP_ID;
+    l_id  NUMBER;
+    l_old CLOB;
+    l_tmp JSON_ARRAY_T;
+  BEGIN
+    guard(p_app, p_page);
+    BEGIN
+      SELECT VERSION_ID, CHANGES INTO l_id, l_old
+        FROM VD_LAYOUT_VERSIONS
+       WHERE WORKSPACE_ID = l_ws AND APP_ID = p_app AND PAGE_ID = p_page
+       ORDER BY VERSION_ID DESC FETCH FIRST 1 ROW ONLY;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20232, 'There is no layout change to undo on this page.');
+    END;
+    l_tmp := write_layout(p_app, p_page, p_token, l_old, FALSE);
+    DELETE FROM VD_LAYOUT_VERSIONS WHERE VERSION_ID = l_id;
+    RETURN PKG_VD_PAGE_CODE.layout_token(p_app, p_page);
+  END undo_layout;
 END PKG_VD_PAGE_WRITER;
 /

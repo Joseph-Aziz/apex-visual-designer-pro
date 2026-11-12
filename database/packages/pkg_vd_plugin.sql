@@ -233,6 +233,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PLUGIN AS
       l_cur := pkg_vd_page_code.list_versions(l_app, l_page);
     ELSIF l_action = 'layout' THEN
       l_layout := pkg_vd_page_code.layout_json(l_app, l_page);
+    ELSIF l_action = 'apply_layout' THEN
+      l_token := pkg_vd_page_writer.apply_layout(l_app, l_page, apex_application.g_x04, apex_application.g_clob_01);
+    ELSIF l_action = 'undo_layout' THEN
+      l_token := pkg_vd_page_writer.undo_layout(l_app, l_page, apex_application.g_x04);
     ELSE
       RAISE_APPLICATION_ERROR(-20233, 'Unknown designer action.');
     END IF;

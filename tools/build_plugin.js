@@ -10,7 +10,7 @@ const ROOT = path.join(__dirname, '..');
 const FILES = path.join(ROOT, 'plugin', 'files');
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf('--' + name); return i >= 0 ? args[i + 1] : def; };
-const VERSION = opt('version', '1.1.0');
+const VERSION = opt('version', '1.2.0');
 const OUT = opt('out', path.join(ROOT, 'plugin', 'region_type_plugin_apex_visual_designer.sql'));
 const NAME = 'COM.APEXVD.VISUAL_DESIGNER';
 
@@ -29,7 +29,7 @@ function list(dir) {
 // slash-terminated statement becomes one chunk; MARK separates the chunks.
 const MARK = '\n--@@VD_STMT@@\n';
 const INSTALL = ['tables/vd_install', 'tables/vd_target_applications', 'tables/vd_page_code_versions',
-  'tables/vd_theme_versions', 'packages/pkg_vd_design_api', 'packages/pkg_vd_page_code', 'packages/pkg_vd_theme',
+  'tables/vd_theme_versions', 'tables/vd_layout_versions', 'packages/pkg_vd_design_api', 'packages/pkg_vd_page_code', 'packages/pkg_vd_theme',
   'packages/pkg_vd_page_writer', 'packages/pkg_vd_plugin'];
 
 // A cut at a "/" line inside a comment or literal, or the separator inside the text, would run a

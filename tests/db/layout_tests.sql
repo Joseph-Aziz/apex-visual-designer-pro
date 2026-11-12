@@ -55,3 +55,77 @@ BEGIN
   DBMS_OUTPUT.PUT_LINE(l_pass || ' passed, ' || l_fail || ' failed');
 END;
 /
+
+-- Layout board: applying and undoing changes. WRITES the scratch page; run only on a scratch page.
+-- Each change is undone at the end, so the page ends as it started.
+DECLARE
+  l_pass  PLS_INTEGER := 0;
+  l_fail  PLS_INTEGER := 0;
+  l_token VARCHAR2(40);
+  l_r1    VARCHAR2(40);
+  l_seq   NUMBER;
+  l_n     NUMBER;
+
+  PROCEDURE ok(p_name VARCHAR2, p_cond BOOLEAN) IS
+  BEGIN
+    IF p_cond THEN l_pass := l_pass + 1; DBMS_OUTPUT.PUT_LINE('PASS ' || p_name);
+    ELSE l_fail := l_fail + 1; DBMS_OUTPUT.PUT_LINE('FAIL ' || p_name); END IF;
+  END;
+  -- Runs a change list that must be refused with p_code.
+  PROCEDURE refused(p_name VARCHAR2, p_token VARCHAR2, p_changes VARCHAR2, p_code NUMBER) IS
+    l_t VARCHAR2(40);
+  BEGIN
+    l_t := &&VD_SCHEMA..PKG_VD_PAGE_WRITER.apply_layout(&&TEST_APP, &&SCRATCH_PAGE, p_token, p_changes);
+    ok(p_name, FALSE);
+  EXCEPTION
+    WHEN OTHERS THEN ok(p_name || ' (' || SQLCODE || ')', SQLCODE = p_code);
+  END;
+  FUNCTION region_seq(p_id VARCHAR2) RETURN NUMBER IS
+    l_s NUMBER;
+  BEGIN
+    SELECT display_sequence INTO l_s FROM apex_application_page_regions
+     WHERE application_id = &&TEST_APP AND page_id = &&SCRATCH_PAGE AND region_id = TO_NUMBER(p_id);
+    RETURN l_s;
+  END;
+BEGIN
+  SELECT TO_CHAR(region_id), display_sequence INTO l_r1, l_seq FROM apex_application_page_regions
+   WHERE application_id = &&TEST_APP AND page_id = &&SCRATCH_PAGE AND parent_region_id IS NULL
+     AND display_position = 'BODY'
+   ORDER BY display_sequence FETCH FIRST 1 ROW ONLY;
+  l_token := &&VD_SCHEMA..PKG_VD_PAGE_CODE.layout_token(&&TEST_APP, &&SCRATCH_PAGE);
+
+  refused('stale token refused', 'x' || l_token,
+    '[{"kind":"region","id":"' || l_r1 || '","slot":"BODY","parent":null,"seq":5}]', -20230);
+  refused('unknown region refused', l_token,
+    '[{"kind":"region","id":"1","slot":"BODY","parent":null,"seq":5}]', -20243);
+  refused('region inside itself refused', l_token,
+    '[{"kind":"region","id":"' || l_r1 || '","parent":"' || l_r1 || '","seq":5}]', -20243);
+  refused('span 13 refused', l_token,
+    '[{"kind":"region","id":"' || l_r1 || '","slot":"BODY","parent":null,"seq":5,"span":13}]', -20243);
+  refused('unknown slot refused', l_token,
+    '[{"kind":"region","id":"' || l_r1 || '","slot":"NO_SUCH_SLOT","parent":null,"seq":5}]', -20243);
+  refused('empty change list refused', l_token, '[]', -20243);
+  BEGIN
+    l_token := &&VD_SCHEMA..PKG_VD_PAGE_WRITER.apply_layout(&&TEST_APP, &&SCRATCH_PAGE, l_token,
+      '[{"kind":"region","id":"' || l_r1 || '","slot":"BODY","parent":null,"seq":' || (l_seq + 1) || '}]', TRUE);
+    ok('failure after import raises', FALSE);
+  EXCEPTION
+    WHEN OTHERS THEN ok('failure after import puts the page back', region_seq(l_r1) = l_seq);
+  END;
+  l_token := &&VD_SCHEMA..PKG_VD_PAGE_CODE.layout_token(&&TEST_APP, &&SCRATCH_PAGE);
+
+  l_token := &&VD_SCHEMA..PKG_VD_PAGE_WRITER.apply_layout(&&TEST_APP, &&SCRATCH_PAGE, l_token,
+    '[{"kind":"region","id":"' || l_r1 || '","slot":"BODY","parent":null,"seq":' || (l_seq + 1) || '}]');
+  ok('apply writes the sequence', region_seq(l_r1) = l_seq + 1);
+  ok('apply returns the new token', l_token = &&VD_SCHEMA..PKG_VD_PAGE_CODE.layout_token(&&TEST_APP, &&SCRATCH_PAGE));
+  SELECT COUNT(*) INTO l_n FROM &&VD_SCHEMA..VD_LAYOUT_VERSIONS WHERE app_id = &&TEST_APP AND page_id = &&SCRATCH_PAGE;
+  ok('apply keeps a version', l_n >= 1);
+
+  l_token := &&VD_SCHEMA..PKG_VD_PAGE_WRITER.undo_layout(&&TEST_APP, &&SCRATCH_PAGE, l_token);
+  ok('undo puts the sequence back', region_seq(l_r1) = l_seq);
+  SELECT COUNT(*) - l_n INTO l_n FROM &&VD_SCHEMA..VD_LAYOUT_VERSIONS WHERE app_id = &&TEST_APP AND page_id = &&SCRATCH_PAGE;
+  ok('undo forgets the version', l_n = -1);
+
+  DBMS_OUTPUT.PUT_LINE(l_pass || ' passed, ' || l_fail || ' failed');
+END;
+/
