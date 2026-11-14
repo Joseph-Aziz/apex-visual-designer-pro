@@ -89,6 +89,22 @@ BEGIN
   &&VD_SCHEMA..PKG_VD_PAGE_WRITER.read_code(&&TEST_APP, &&SCRATCH_PAGE, l_orig_css, l_orig_js);
   ok('write_code round-trips quotes', l_orig_css = 'p{color:red}' AND l_orig_js = 'var a = ''it''''s'';');
 
+  -- a write that fails after the import puts the page back as it was (it must never be lost)
+  &&VD_SCHEMA..PKG_VD_PAGE_WRITER.g_fail_after_import := TRUE;
+  BEGIN
+    &&VD_SCHEMA..PKG_VD_PAGE_WRITER.write_code(&&TEST_APP, &&SCRATCH_PAGE, 'lost{}', NULL);
+    ok('failed write_code raises', FALSE);
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
+  &&VD_SCHEMA..PKG_VD_PAGE_WRITER.g_fail_after_import := FALSE;
+  SELECT COUNT(*) INTO l_n FROM APEX_APPLICATION_PAGES WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE;
+  ok('failed write_code keeps the page', l_n = 1);
+  &&VD_SCHEMA..PKG_VD_PAGE_WRITER.read_code(&&TEST_APP, &&SCRATCH_PAGE, l_css, l_js);
+  ok('failed write_code puts the old code back', l_css = l_orig_css AND l_js = l_orig_js);
+  SELECT COUNT(*) INTO l_n FROM APEX_APPLICATION_PAGE_REGIONS WHERE APPLICATION_ID = &&TEST_APP AND PAGE_ID = &&SCRATCH_PAGE AND REGION_ID = l_region;
+  ok('failed write_code keeps the regions', l_n = 1);
+
   raises('save with stale token', -20230,
      'declare t varchar2(100); begin t := &&VD_SCHEMA..PKG_VD_PAGE_WRITER.save_design(&&TEST_APP, &&SCRATCH_PAGE, ''0-0'', ''{}'', ''X'', NULL); end;');
 

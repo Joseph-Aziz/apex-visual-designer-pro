@@ -2,6 +2,10 @@
 -- Installed by database/install.sql into the schema that runs it.
 
 CREATE OR REPLACE PACKAGE PKG_VD_PAGE_WRITER AUTHID CURRENT_USER AS
+  -- For the database tests: when TRUE every page write fails after its import, to prove that
+  -- the page is put back as it was.
+  g_fail_after_import BOOLEAN := FALSE;
+
   -- Current Inline CSS and Execute when Page Loads JS of a page.
   PROCEDURE read_code(p_app IN NUMBER, p_page IN NUMBER, p_css OUT CLOB, p_js OUT CLOB);
 
@@ -173,11 +177,27 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
     RETURN SUBSTR(p_src, 1, l_a - 1) || l_call || p_add || SUBSTR(p_src, l_b);
   END edit_call;
 
+  -- Imports p_new over a page whose export is p_old. A page import removes the page first, so
+  -- when any part of it fails the old export is imported again; the page is never left removed.
+  PROCEDURE replace_page(p_old IN CLOB, p_new IN CLOB, p_fail_after_import IN BOOLEAN DEFAULT FALSE) IS
+  BEGIN
+    import_page(p_new);
+    IF p_fail_after_import OR g_fail_after_import THEN
+      RAISE_APPLICATION_ERROR(-20234, 'Test failure after the import.');
+    END IF;
+  EXCEPTION
+    WHEN OTHERS THEN
+      import_page(p_old);
+      RAISE;
+  END replace_page;
+
   PROCEDURE write_code(p_app IN NUMBER, p_page IN NUMBER, p_css IN CLOB, p_js IN CLOB) IS
     l_owner VARCHAR2(128);
+    l_src   CLOB;
   BEGIN
     guard(p_app, p_page);
-    import_page(edit_call(export_page(p_app, p_page, l_owner), 'wwv_flow_imp_page.create_page(',
+    l_src := export_page(p_app, p_page, l_owner);
+    replace_page(l_src, edit_call(l_src, 'wwv_flow_imp_page.create_page(',
       apex_t_varchar2('p_inline_css', 'p_javascript_code_onload'),
       CHR(10) || ',p_inline_css=>' || literal(p_css) || CHR(10) || ',p_javascript_code_onload=>' || literal(p_js)));
   END write_code;
@@ -225,6 +245,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
   PROCEDURE set_static_id(p_app IN NUMBER, p_page IN NUMBER, p_kind IN VARCHAR2,
                           p_component_id IN NUMBER, p_static_id IN VARCHAR2) IS
     l_owner VARCHAR2(128);
+    l_src   CLOB;
     l_n     NUMBER;
     l_head  VARCHAR2(200);
     l_arg   VARCHAR2(30);
@@ -257,7 +278,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
     IF l_n > 0 THEN
       RAISE_APPLICATION_ERROR(-20237, 'Page ' || p_page || ' already uses "' || p_static_id || '". Choose another Static ID.');
     END IF;
-    import_page(edit_call(export_page(p_app, p_page, l_owner),
+    l_src := export_page(p_app, p_page, l_owner);
+    replace_page(l_src, edit_call(l_src,
       l_head || CHR(10) || ' p_id=>wwv_flow_imp.id(' || TO_CHAR(p_component_id) || ')',
       apex_t_varchar2(l_arg), CHR(10) || ',' || l_arg || '=>''' || p_static_id || ''''));
   END set_static_id;
@@ -276,6 +298,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
   PROCEDURE set_css_class(p_app IN NUMBER, p_page IN NUMBER, p_kind IN VARCHAR2,
                           p_component_id IN NUMBER, p_type IN VARCHAR2, p_cls IN VARCHAR2) IS
     l_owner   VARCHAR2(128);
+    l_src     CLOB;
     l_classes VARCHAR2(4000);
     l_head    VARCHAR2(200);
     l_arg     VARCHAR2(30);
@@ -305,7 +328,8 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
         RAISE_APPLICATION_ERROR(-20238, 'That component is not on page ' || p_page || '.');
     END;
     l_classes := with_class(l_classes, p_type, p_cls);
-    import_page(edit_call(export_page(p_app, p_page, l_owner),
+    l_src := export_page(p_app, p_page, l_owner);
+    replace_page(l_src, edit_call(l_src,
       l_head || CHR(10) || ' p_id=>wwv_flow_imp.id(' || TO_CHAR(p_component_id) || ')',
       apex_t_varchar2(l_arg), CASE WHEN l_classes IS NOT NULL THEN CHR(10) || ',' || l_arg || '=>' || literal(l_classes) END));
   END set_css_class;
@@ -359,10 +383,12 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
     l_new    NUMBER;
     l_a      PLS_INTEGER;
     l_b      PLS_INTEGER;
+    l_old    CLOB;
   BEGIN
     l_html := '<link rel="stylesheet" href="#APP_FILES#vd-theme.css?v=' || p_version || '">' ||
       CASE WHEN p_has_js THEN '<script src="#APP_FILES#vd-theme.js?v=' || p_version || '"></script>' END;
     l_src := export_page(p_app, 0, l_owner);
+    l_old := l_src;
     EXECUTE IMMEDIATE 'SELECT MAX(REGION_ID) FROM APEX_APPLICATION_PAGE_REGIONS WHERE APPLICATION_ID = :a AND PAGE_ID = 0 AND STATIC_ID = ''vd-theme-link'''
       INTO l_region USING p_app;
     IF l_region IS NOT NULL THEN
@@ -391,7 +417,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
         ',p_plug_source=>' || literal(l_html) || CHR(10) ||
         ');' || SUBSTR(l_src, l_b + 3);
     END IF;
-    import_page(l_src);
+    replace_page(l_old, l_src);
   END write_theme_link;
 
   PROCEDURE apply_theme(p_app IN NUMBER, p_version IN NUMBER, p_css IN CLOB, p_js IN CLOB) IS
@@ -703,14 +729,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
     l_state := JSON_OBJECT_T.parse(PKG_VD_PAGE_CODE.layout_json(p_app, p_page));
     l_old := merge_layout(l_state, l_changes);
     l_src := export_page(p_app, p_page, l_owner);
-    BEGIN
-      import_page(layout_source(l_src, l_changes));
-      IF p_fail_after_import THEN RAISE_APPLICATION_ERROR(-20234, 'Test failure after the import.'); END IF;
-    EXCEPTION
-      WHEN OTHERS THEN
-        import_page(l_src);
-        RAISE;
-    END;
+    replace_page(l_src, layout_source(l_src, l_changes), p_fail_after_import);
     RETURN l_old;
   END write_layout;
 
