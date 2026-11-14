@@ -85,9 +85,9 @@ BEGIN
   &&VD_SCHEMA..PKG_VD_PAGE_CODE.get_latest(&&TEST_APP, &&SCRATCH_PAGE, l_start, l_css, l_js, l_d);
   l_start := NVL(l_start, 0);
   l_had := &&VD_SCHEMA..PKG_VD_PAGE_CODE.version_count(&&TEST_APP, &&SCRATCH_PAGE);
-  &&VD_SCHEMA..PKG_VD_PAGE_WRITER.write_code(&&TEST_APP, &&SCRATCH_PAGE, 'p{color:red}', 'var a = ''it''''s'';');
+  &&VD_SCHEMA..PKG_VD_PAGE_WRITER.write_code(&&TEST_APP, &&SCRATCH_PAGE, 'p{color:red}', 'var a = "it''s";');
   &&VD_SCHEMA..PKG_VD_PAGE_WRITER.read_code(&&TEST_APP, &&SCRATCH_PAGE, l_orig_css, l_orig_js);
-  ok('write_code round-trips quotes', l_orig_css = 'p{color:red}' AND l_orig_js = 'var a = ''it''''s'';');
+  ok('write_code round-trips quotes', l_orig_css = 'p{color:red}' AND l_orig_js = 'var a = "it''s";');
 
   -- a write that fails after the import puts the page back as it was (it must never be lost)
   &&VD_SCHEMA..PKG_VD_PAGE_WRITER.g_fail_after_import := TRUE;
