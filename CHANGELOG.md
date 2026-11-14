@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.3.0 - 2026-11-14
+
+- **Shared page bar:** open a page once (App, Page, Add application, Open page) above the views, then choose **Design items** or **Layout** in the rail. The open page is remembered after a reload. The Theme Designer hides the bar, because it works on the whole application.
+- **Leaving with unsaved changes:** Design items now asks to save, discard or stay, as Layout already did.
+- **Chart Designer:** a native chart region opens a designer of its own. Pick the engine, Oracle JET or Apache ECharts (shipped with the plug-in, no CDN), then style each part: chart, series, points, axes, labels, legend, tooltip and reference lines, with Basic and Advanced settings, undo and redo, and templates such as Monthly sales and Statistics. ECharts adds gauge, waterfall and heatmap. Older chart looks are converted to Chart Designer settings when the page is opened.
+- **Dashboard looks:** a seventh look, **Dashboard**, for Region, Cards, Button, Radio group, Checkbox group and Date field, matching a hand-built statistics page (white cards, 16px corners, soft shadow, Cairo font).
+- **Theme style on a component:** Design items can put one of the pushed theme's named styles on the selected component.
+- **Page 0:** Design items accepts page 0, as the page bar and Layout already did.
+- **Fix:** when a page write fails after the import step, the page is put back as it was. A page is never lost.
+- **Fix:** the CSS class list is quoted when written into the page.
+
+## 1.2.0 - 2026-11-12
+
+- **Layout Board:** rearrange the open page's regions and items on APEX's 12-column grid: drag between slots and regions, start or join a row, set the column span. **Apply** writes every change in one page re-import, **Revert** discards unapplied changes, and **Undo apply** restores the layout from before the last apply (the last 10 per page are kept). Apply is refused when the page changed in App Builder since the board loaded it.
+
 ## 1.1.0 - 2026-11-12
 
 - **One-step install:**

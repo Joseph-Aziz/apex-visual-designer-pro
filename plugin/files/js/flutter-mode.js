@@ -58,7 +58,8 @@
     render(lost);
   }
 
-  function dirty() { return !!state.page && JSON.stringify(state.design) !== state.savedJson; }
+  function hasPage() { return state.page != null; }
+  function dirty() { return hasPage() && JSON.stringify(state.design) !== state.savedJson; }
   function output() { return G().generate({ app: state.app, page: state.page, components: state.design.components },
     { echartsUrl: G().echartsUrl(document.baseURI), chartRuntime: state.chartRuntime }); }
 
@@ -258,7 +259,7 @@
 
   function loadPreview() {
     var box = host.querySelector('.fl-preview');
-    if (!state.page) { box.innerHTML = '<div class="lk-empty">Attach a page to see it here.</div>'; frame = null; return; }
+    if (!hasPage()) { box.innerHTML = '<div class="lk-empty">Attach a page to see it here.</div>'; frame = null; return; }
     frame = document.createElement('iframe');
     frame.className = 'lk-frame';
     frame.title = 'Page preview';
@@ -287,14 +288,14 @@
     var top = host.querySelector('.fl-top');
     top.innerHTML =
       '<strong class="fl-title">Design items</strong>' +
-      '<span class="lk-state">' + (state.page ? (dirty() ? 'Unsaved changes' : 'Saved') : '') + '</span>' +
+      '<span class="lk-state">' + (hasPage() ? (dirty() ? 'Unsaved changes' : 'Saved') : '') + '</span>' +
       '<span class="lk-spacer"></span>' +
       '<button class="vd-btn vd-btn--ghost fl-undo" title="Undo (Ctrl+Z)"' + (state.undo && state.undo.canUndo() ? '' : ' disabled') + '>Undo</button>' +
       '<button class="vd-btn vd-btn--ghost fl-redo" title="Redo (Ctrl+Y)"' + (state.undo && state.undo.canRedo() ? '' : ' disabled') + '>Redo</button>' +
       '<button class="vd-btn vd-btn--ghost fl-use-page" aria-pressed="' + state.usePage + '" title="Use the page in the preview: fill items and submit, for example to show a chart that needs dates. Turn off to select components again.">' +
         (state.usePage ? 'Using page: on' : 'Use page') + '</button>' +
-      '<button class="vd-btn vd-btn--ghost fl-history"' + (state.page ? '' : ' disabled') + '>History</button>' +
-      '<button class="vd-btn vd-btn--primary fl-save"' + (state.page && dirty() && !state.busy ? '' : ' disabled') + '>Save to page</button>';
+      '<button class="vd-btn vd-btn--ghost fl-history"' + (hasPage() ? '' : ' disabled') + '>History</button>' +
+      '<button class="vd-btn vd-btn--primary fl-save"' + (hasPage() && dirty() && !state.busy ? '' : ' disabled') + '>Save to page</button>';
     top.querySelector('.fl-history').addEventListener('click', openHistory);
     top.querySelector('.fl-undo').addEventListener('click', function () { step(false); });
     top.querySelector('.fl-redo').addEventListener('click', function () { step(true); });
@@ -311,7 +312,7 @@
     var names = { text: 'Text fields', date: 'Date pickers', select: 'Lists', choice: 'Checkboxes and radios', 'switch': 'Switches',
       button: 'Buttons', display: 'Display only', region: 'Regions', classic: 'Classic reports', ir: 'Interactive reports', ig: 'Interactive grids', cards: 'Cards', chart: 'Charts', other: 'Not supported' };
     var order = V().types.concat(['other']);
-    var html = state.page ? order.filter(function (g) { return groups[g]; }).map(function (g) {
+    var html = hasPage() ? order.filter(function (g) { return groups[g]; }).map(function (g) {
       return '<h3>' + names[g] + '</h3>' + groups[g].map(function (c) {
         var blocked = !c.ftype ? 'type not supported' : '';
         var ch = choice(c.key);
@@ -456,7 +457,7 @@
       return;
     }
     if (!c) {
-      right.innerHTML = state.page ? '<p class="lk-hint">Select a component in the list or click it on the page.</p>' : '';
+      right.innerHTML = hasPage() ? '<p class="lk-hint">Select a component in the list or click it on the page.</p>' : '';
     } else {
       var ch = choice(c.key);
       var t = VD.flParams.thumbnails(c.ftype, ch && ch.variant);

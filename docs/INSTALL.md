@@ -47,9 +47,19 @@ If saving fails with "Allow page edits: Shared Components > Security Attributes 
 
 Import the new plug-in export over the old one. The next view of a page with the designer region updates the packages. Tables, saved versions and registered applications are kept.
 
+## Separate designer schema (optional)
+
+By default the plug-in installs its objects into the host application's parsing schema. To keep them in a schema of their own instead, run the scripts in `database/` before the first page view:
+
+1. `install.sql <designer schema> <parsing schema>`, connected as the designer schema's owner. It creates the tables and packages and grants the parsing schema execute on `PKG_VD_PLUGIN`.
+2. `host_setup.sql <designer schema>`, connected as the parsing schema. It creates the synonym `PKG_VD_PLUGIN`. When the plug-in finds that synonym, it installs nothing of its own.
+3. `register_target.sql <designer schema> <application id>` for each application to design, or use **Add application** in the designer.
+
+Upgrades then mean running `install.sql` again with the new scripts; the plug-in does not update a separate schema.
+
 ## Uninstall
 
 1. Delete the Visual Designer region and the plug-in from the host application.
-2. Connected as the parsing schema, run `database/uninstall.sql` with that schema's name. This deletes all saved versions.
+2. Connected as the schema that holds the objects (the parsing schema, or the separate designer schema), run `database/uninstall.sql` with that schema's name. This deletes all saved versions. With a separate schema, also drop the synonym `PKG_VD_PLUGIN` in the parsing schema.
 
 Designed applications keep working, because their CSS and JS live in their own pages and files.

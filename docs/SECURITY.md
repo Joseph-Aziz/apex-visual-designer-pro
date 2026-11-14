@@ -7,7 +7,7 @@ Every server call goes through the plug-in's AJAX function. Before doing anythin
 1. **Access.** The region's *Designer authorization* scheme must admit the current user.
    - When the attribute is empty, only a developer signed in to App Builder in the same browser is allowed.
    - A scheme name that does not exist in the host application refuses everyone.
-2. **Target.** The application being designed must be registered and active for the current workspace in `VD_TARGET_APPLICATIONS` (see `register_target.sql`).
+2. **Target.** The application being designed must be registered and active for the current workspace in `VD_TARGET_APPLICATIONS`. The host application is registered on install; others through **Add application** in the designer (same workspace only) or `register_target.sql`.
 
 The browser cannot widen either check, because the region attributes are read on the server.
 

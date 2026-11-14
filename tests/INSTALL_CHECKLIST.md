@@ -29,6 +29,24 @@ Run in an APEX 26.2 application on a scratch page. Apply and Undo apply re-impor
 | M5 | Drag a change, switch to the Flutter Designer: asked to apply or discard | Not run |
 | M6 | Undo apply restores the previous layout | Not run |
 
+## Page bar and Chart Designer (1.3.0)
+
+Run after a fresh install (uninstall, delete the plug-in and region, then the quick start again).
+
+| # | Check | Result |
+| --- | --- | --- |
+| P1 | Open page with an empty page number: "Enter an app and page number.", nothing opens | Not run |
+| P2 | Open a page in Design items; switch to Layout: the same page is loaded without opening it again | Not run |
+| P3 | Theme hides the page bar; Design items and Layout show it | Not run |
+| P4 | Reload the browser: the page bar and the view come back on the same page | Not run |
+| P5 | Change a design, switch to Layout: asked to save, discard or stay; Save then switches | Not run |
+| P6 | Page 0 opens in Design items | Not run |
+| C1 | A native chart: Open Chart Designer, change a series colour: the live chart updates | Not run |
+| C2 | Switch the engine to ECharts: the chart is drawn again; a gauge or heatmap type is offered | Not run |
+| C3 | Save to page, run the page outside the designer: the chart looks the same, and still refreshes | Not run |
+| C4 | A page saved with an old chart look (before 1.3.0) opens with its settings converted and "Unsaved changes" | Not run |
+| U1 | `uninstall.sql`, delete the plug-in and region, import again: the first view installs, and a page designed before still looks designed | Not run |
+
 ## Separate designer schema (1.0.x)
 
 Follow `docs/INSTALL.md` exactly in a workspace that has never had the designer, using a new
