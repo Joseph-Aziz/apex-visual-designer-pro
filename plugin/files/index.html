@@ -61,7 +61,7 @@
 
 <script>
   // Loaded in this order with document.write so each runs before the next, as plain tags would.
-  ['look-selectors', 'page-preview', 'flutter-variants', 'flutter-codegen', 'repository', 'layout-model', 'layout-mode', 'fl-params', 'chart-schema', 'chart-designer', 'chart-migrate', 'undo-stack', 'flutter-mode', 'theme-codegen', 'theme-mode', 'page-bar', 'app'].forEach(function (name) {
+  ['look-selectors', 'page-preview', 'component-registry', 'flutter-variants', 'flutter-codegen', 'repository', 'layout-model', 'layout-mode', 'fl-params', 'chart-schema', 'chart-designer', 'chart-migrate', 'undo-stack', 'flutter-mode', 'theme-codegen', 'theme-mode', 'page-bar', 'app'].forEach(function (name) {
     document.write('<script src="' + vdAsset('js/' + name + '.js') + '"><\/script>');
   });
 </script>
