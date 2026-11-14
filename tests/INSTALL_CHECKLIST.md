@@ -33,17 +33,25 @@ Run in an APEX 26.2 application on a scratch page. Apply and Undo apply re-impor
 
 Run after a fresh install (uninstall, delete the plug-in and region, then the quick start again).
 
+Last run: 2026-11-14, APEX 26.2, an existing host application after its designer objects were dropped. The database suites were run as blocks from `tools/db_test_block.js` in SQL Commands. The suites that write the scratch page or page 0 were not run, because no scratch page was confirmed for them.
+
 | # | Check | Result |
 | --- | --- | --- |
-| P1 | Open page with an empty page number: "Enter an app and page number.", nothing opens | Not run |
-| P2 | Open a page in Design items; switch to Layout: the same page is loaded without opening it again | Not run |
-| P3 | Theme hides the page bar; Design items and Layout show it | Not run |
-| P4 | Reload the browser: the page bar and the view come back on the same page | Not run |
-| P5 | Change a design, switch to Layout: asked to save, discard or stay; Save then switches | Not run |
-| P6 | Page 0 opens in Design items | Not run |
-| C1 | A native chart: Open Chart Designer, change a series colour: the live chart updates | Not run |
-| C2 | Switch the engine to ECharts: the chart is drawn again; a gauge or heatmap type is offered | Not run |
-| C3 | Save to page, run the page outside the designer: the chart looks the same, and still refreshes | Not run |
+| D1 | Import 1.3.0 over 1.2.11: plug-in shows 1.3.0; the first view upgrades `VD_INSTALL` to 1.3.0 | PASS |
+| D2 | `tests/db/bootstrap_tests.sql` | PASS 6/6 (a first run before the re-import failed the version check, as expected) |
+| D3 | `tests/db/plugin_api_tests.sql` | PASS 6/6 |
+| D4 | `tests/db/layout_tests.sql`, read block | 4/5: "each item sits in its dictionary region" fails because the page used was the designer's own page, which has no items; the suite needs a page with at least one item in a region |
+| D6 | The designer's file URLs carry the release version | FAIL, fixed, then PASS: `PKG_VD_PLUGIN` stamped `index.html?v=1.1.0`, so browsers could keep old files after an upgrade; the stamp now follows the release and a unit test holds it. After re-import (with `VD_INSTALL` marked older so the package reinstalls) the iframe loads `index.html?v=1.3.0` |
+| D5 | `tests/db/layout_tests.sql` apply block, `page_code_tests.sql`, `theme_tests.sql` | Not run (they write the scratch page and page 0) |
+| P1 | Open page with an empty page number: "Enter an app and page number.", nothing opens | PASS |
+| P2 | Open a page in Design items; switch to Layout: the same page is loaded without opening it again | PASS |
+| P3 | Theme hides the page bar; Design items and Layout show it | PASS |
+| P4 | Reload the browser: the page bar and the view come back on the same page | PASS |
+| P5 | Change a design, switch to Layout: asked to save, discard or stay; Save then switches | PASS (a page with a region, an item and a button; OK on the prompt saved the design, then Layout opened) |
+| P6 | Page 0 opens in Design items | FAIL, fixed, then PASS: the preview showed APEX's \"cannot be invoked using a URL\" error; page 0 now lists its components and shows a no-preview message in Design items and Layout |
+| C1 | A native chart: Open Chart Designer, change a series colour: the live chart updates | PASS (series colour set to red; the live Oracle JET line turned red) |
+| C2 | Switch the engine to ECharts: the chart is drawn again; a gauge or heatmap type is offered | PASS (ECharts drew the chart on a canvas; gauge, waterfall and heatmap offered) |
+| C3 | Save to page, run the page outside the designer: the chart looks the same, and still refreshes | FAIL, fixed, then PASS: the save first failed with ORA-06502, because it wrote the whole chart runtime (about 57,000 characters) into the page JavaScript and the page import takes at most 32,767. The page now loads the runtime from the plug-in files. After re-import, the page run outside the designer loaded the four chart files, kept the 12px corners and background, and kept them after a region refresh |
 | C4 | A page saved with an old chart look (before 1.3.0) opens with its settings converted and "Unsaved changes" | Not run |
 | U1 | `uninstall.sql`, delete the plug-in and region, import again: the first view installs, and a page designed before still looks designed | Not run |
 
