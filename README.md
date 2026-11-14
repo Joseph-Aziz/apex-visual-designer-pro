@@ -9,6 +9,7 @@ A Layout Board rearranges a page's regions and items on the 12-column grid and a
 - Install: import the plug-in, add the region, done. Details: [docs/INSTALL.md](docs/INSTALL.md)
 - Using it: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
 - Security: [docs/SECURITY.md](docs/SECURITY.md)
+- Roadmap: [docs/ROADMAP.md](docs/ROADMAP.md)
 
 Requires Oracle APEX 26.1 or later (tested on 26.2). License: MIT.
 
