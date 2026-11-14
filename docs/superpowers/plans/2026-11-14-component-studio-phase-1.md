@@ -220,6 +220,32 @@ Two existing behaviours need care:
 
 The alternative, a new workspace-level table, is in section E.
 
+### C.8 Visual shell
+
+The owner's product concept (an HTML mockup reviewed on 2026-11-14) sets the look for tasks 7, 8 and 10. Adopted from it:
+
+- **Three panels:** component gallery on the left, the live page in the middle, the design inspector on the right. This is the layout Design items already has.
+- **Gallery tiles:** a two-column grid of members under category headings, with a search box. Each tile shows the member's name and the count of matching components on the open page.
+- **Preview toolbar:** a Desktop, Tablet and Mobile switch that changes only the width of the preview frame. It adds no setting and stores nothing.
+- **Status strip** under the preview: the selected component and its design.
+- **Quick palette** in the inspector: swatches taken from the application theme's accent colour and the colours of its styles.
+- **Rail entry "Saved designs":** lists the application's presets (task 10). The rail keeps Design items (shown as "Component Studio"), Theme Designer and Layout.
+- **Text size:** nothing in the designer is smaller than 12px.
+
+Changed from the concept, and why:
+
+| Concept | In 1.4.0 | Reason |
+| --- | --- | --- |
+| Designs as text buttons | Visual thumbnails, as today | The gallery must show what a design looks like. |
+| The gallery restyles one sample field | Two lists: "On this page" and "All components" | A real page can hold several components of one type; the user must pick which. |
+| "Properties" tab, "Label position" | Left out | Native APEX property editing is outside Phase 1. |
+| Static ID field on an item | Shown for regions and buttons only | Items are addressed by their name. |
+| Chart Designer in the rail | Opens from a chart on the page, as today | A top-level view needs its own page and chart picker. Later. |
+| "Settings" in the rail | Left out | Nothing to configure yet. Later. |
+| Page dropdown with page names | Page number input, as today | Needs a new server query. Later. |
+
+The inspector also keeps what the concept does not show: save as preset, built-in and custom badges, reset settings, the state and show / hide sections, and history.
+
 ### C.7 What does not change
 
 `flutter-codegen.js` `generate` and `merge`, the marker format, `pkg_vd_page_writer`, `pkg_vd_page_code`, the chart modules, the Layout Board, `undo-stack.js`, and the stored JSON shapes (only optional fields are added).
@@ -290,13 +316,13 @@ Each task is test-first and leaves all unit tests green. Tasks 2 to 4 change no 
 
 - **Objective:** one gallery with badges, "Reset settings" and a slot for presets.
 - **Existing files:** `fl-params.js`, `flutter-mode.js` (`renderRight`), `theme-mode.js`, `plugin/files/css/editor.css`.
-- **Acceptance:** "Reset settings" keeps the design and clears its values in one undo step; both designers draw the same gallery.
+- **Acceptance:** "Reset settings" keeps the design and clears its values in one undo step; both designers draw the same gallery; the inspector has the status strip and the quick palette of section C.8; no designer text is smaller than 12px.
 
 ### Task 8: Component browser
 
 - **Existing files:** `flutter-mode.js` (`renderLeft`), `editor.css`.
 - **Depends on:** task 4.
-- **Acceptance:** every registered family and member is listed under its category with the right count for the open page; a family with no component on the page opens browse-only.
+- **Acceptance:** every registered family and member is a tile under its category with the right count for the open page; the search box filters the tiles; a family with no component on the page opens browse-only; the Desktop, Tablet and Mobile switch changes the preview width and nothing else.
 
 ### Task 9: Try-on preview
 
@@ -305,7 +331,7 @@ Each task is test-first and leaves all unit tests green. Tasks 2 to 4 change no 
 
 ### Task 10: Presets: save, copy and link
 
-- **Existing files:** `flutter-mode.js`, `theme-mode.js` (reload on entry), `repository.js` (only if a helper is needed).
+- **Existing files:** `flutter-mode.js`, `theme-mode.js` (reload on entry), `app.js` and `index.html` (the "Saved designs" rail entry), `repository.js` (only if a helper is needed).
 - **Depends on:** task 7 and decision 2.
 - **Acceptance:** "Save as preset" adds one theme draft version and shows the preset in the gallery of every page of that application; copy is one undo step; the Theme Designer shows the new preset without a browser reload; a saved page with a copied preset opens on 1.3.0-shaped data without error.
 - **Risk:** two browser tabs editing the same theme. The last save wins, as it does today.
@@ -442,6 +468,7 @@ Each task is test-first and leaves all unit tests green. Tasks 2 to 4 change no 
 - `plugin/files/js/flutter-mode.js`
 - `plugin/files/js/theme-codegen.js`
 - `plugin/files/js/theme-mode.js`
+- `plugin/files/js/app.js`
 - `plugin/files/js/look-selectors.js` (only if task 0 finds wrong selectors)
 - `plugin/files/js/repository.js` (only if a preset helper is needed)
 - `plugin/files/css/editor.css`
