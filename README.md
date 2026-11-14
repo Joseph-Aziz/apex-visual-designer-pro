@@ -15,3 +15,4 @@ Requires Oracle APEX 26.2. License: MIT.
 Rebuild the plug-in export after changing `plugin/files`: `node tools/build_plugin.js`.
 Tests: `node tests/unit/<name>_test.js` for each file in `tests/unit`; the SQL suites in
 `tests/db` run in an APEX SQL Workshop session (see each file's header).
+`node tools/db_test_block.js tests/db/<file>.sql <schema> <app> <page>` prints the file as blocks for SQL Commands.
