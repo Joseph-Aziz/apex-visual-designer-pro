@@ -55,10 +55,13 @@ assert.strictEqual(r.ok, false, 'R1 span 8 refused');
 assert.ok(/12 columns/.test(r.reason), 'reason names 12 columns');
 assert.strictEqual(M.dirty(b), false, 'board unchanged after refusal');
 
-// span resize refused when row overflows
+// a box that does not lead its row and outgrows it starts a row of its own
 r = M.setSpan(b, 'region', 'R2', 7);
-assert.strictEqual(r.ok, false, 'R2 span 7 refused');
+assert.ok(r.ok, 'R2 span 7 moves R2 to its own row');
+assert.strictEqual(find(M.changes(b), 'R2').newRow, true, 'R2 starts a new row');
+b = M.load(fixture());
 assert.ok(M.setSpan(b, 'region', 'R2', 4).ok, 'R2 span 4 ok');
+assert.strictEqual(find(M.changes(b), 'R2').newRow, false, 'R2 keeps its row when it fits');
 assert.strictEqual(find(M.changes(b), 'R2').span, 4, 'span change listed');
 assert.strictEqual(M.setSpan(b, 'region', 'R2', 13).ok, false, 'span above 12 refused');
 
@@ -130,3 +133,37 @@ b.comps['region:R3'].span = 8; b.comps['item:I1'].span = 8; b.comps['item:I1'].n
 assert.ok(M.setSpan(b, 'item', 'I1', 8).ok, 'span-8 item after span-8 sub-region is a separate row');
 
 console.log('layout_model_test: all passed');
+// drop at the end of a row that has a row after it: joins that row, the next row stays
+{
+  const f = fixture();
+  f.regions[1].newRow = true;
+  f.regions.push({ id: 'R4', title: 'Four', parent: null, slot: 'BODY', seq: 30, newRow: true, newCol: true, colStart: null, span: 3, hidden: false });
+  const bb = M.load(f);
+  assert.ok(M.move(bb, 'region', 'R4', { container: 'slot:BODY', before: 'R2', sameRow: true, endOfRow: true }).ok, 'R4 end of row 1');
+  const rows = M.rows(bb, 'slot:BODY').map((row) => row.map((c) => c.id));
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(rows)), [['R1', 'R4'], ['R2']], 'R4 beside R1, R2 keeps its row');
+}
+console.log('layout_model_test: end of row passed');
+// buttons: body buttons share rows with items, others sit in a strip of their region and position
+{
+  const f = fixture();
+  const rid = f.regions[0].id;
+  f.items = [{ id: 'I9', name: 'P1_X', label: 'X', region: rid, seq: 10, newRow: true, newCol: true, colStart: null, span: 6, hidden: false }];
+  f.buttons = [
+    { id: 'B1', name: 'SAVE', label: 'Save', region: rid, position: 'BELOW_BOX', seq: 10, newRow: true, newCol: true, colStart: null, span: null, hidden: false },
+    { id: 'B2', name: 'GO', label: 'Go', region: rid, position: 'BODY', seq: 20, newRow: false, newCol: true, colStart: null, span: 6, hidden: false }
+  ];
+  const bb = M.load(f);
+  assert.deepStrictEqual(Array.from(bb.order['btn:' + rid + ':BELOW_BOX']), ['button:B1'], 'BELOW_BOX strip');
+  const body = M.rows(bb, 'region:' + rid).map((row) => row.map((c) => c.kind + ':' + c.id));
+  assert.ok(body.some((row) => row.join() === 'item:I9,button:B2'), 'item and body button share a row');
+  assert.ok(M.move(bb, 'button', 'B1', { container: 'region:' + rid, beforeKey: 'item:I9', sameRow: false }).ok, 'strip button into body');
+  assert.strictEqual(bb.comps['button:B1'].position, 'BODY', 'becomes a body button');
+  assert.strictEqual(bb.order['btn:' + rid + ':BELOW_BOX'].length, 0, 'strip kept, empty');
+  assert.ok(M.move(bb, 'button', 'B2', { container: 'btn:' + rid + ':BELOW_BOX', beforeKey: null, sameRow: false }).ok, 'body button into strip');
+  assert.strictEqual(bb.comps['button:B2'].position, 'BELOW_BOX', 'takes the strip position');
+  assert.ok(!M.move(bb, 'item', 'I9', { container: 'btn:' + rid + ':BELOW_BOX', beforeKey: null }).ok, 'items stay out of strips');
+  const ch = Array.from(M.changes(bb)).filter((c) => c.kind === 'button').map((c) => c.id + ':' + c.position).sort();
+  assert.deepStrictEqual(ch, ['B1:BODY', 'B2:BELOW_BOX'], 'button changes carry their position');
+}
+console.log('layout_model_test: buttons passed');

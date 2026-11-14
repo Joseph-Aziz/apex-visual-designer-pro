@@ -1,19 +1,26 @@
-/* APEX Visual Designer — layout board model: regions and items of one page as plain data.
-   Moves and span changes are checked here (12-column rows, no region inside itself, items need
-   a region) and the board lists only the components whose layout values changed. */
+/* APEX Visual Designer — layout board model: regions, items and region buttons of one page as
+   plain data. Moves and span changes are checked here (12-column rows, no region inside itself,
+   items and buttons need a region) and the board lists only the components whose layout values
+   changed. Items and buttons share rows and sequence numbers inside a region body, as the page
+   renders them; a button at another position (BELOW_BOX, NEXT, ...) sits in a strip of its own. */
 (function () {
   window.VD = window.VD || {};
 
   var FIELDS = { region: ['slot', 'parent', 'seq', 'newRow', 'newCol', 'colStart', 'span'],
-    item: ['region', 'seq', 'newRow', 'newCol', 'colStart', 'span'] };
+    item: ['region', 'seq', 'newRow', 'newCol', 'colStart', 'span'],
+    button: ['region', 'position', 'seq', 'newRow', 'newCol', 'colStart', 'span'] };
   var SUB = 'SUB_REGIONS';
 
   function copy(o) { return JSON.parse(JSON.stringify(o)); }
   function key(kind, id) { return kind + ':' + id; }
+  // Regions make rows of their own; items and buttons share theirs.
+  function group(kind) { return kind === 'region' ? 'region' : 'field'; }
 
-  // Container key of a component: top regions sit in their slot, sub-regions and items in a region.
+  // Container key of a component: top regions sit in their slot, sub-regions, items and body
+  // buttons in a region, other buttons in the strip of their region and position.
   function containerOf(c) {
     if (c.kind === 'region') return c.parent != null ? 'region:' + c.parent : 'slot:' + c.slot;
+    if (c.kind === 'button' && c.position !== 'BODY') return 'btn:' + c.region + ':' + c.position;
     return c.region != null ? 'region:' + c.region : 'noregion';
   }
 
@@ -21,10 +28,11 @@
     var comps = {};
     (json.regions || []).forEach(function (r) { var c = copy(r); c.kind = 'region'; comps[key('region', r.id)] = c; });
     (json.items || []).forEach(function (i) { var c = copy(i); c.kind = 'item'; comps[key('item', i.id)] = c; });
+    (json.buttons || []).forEach(function (b) { var c = copy(b); c.kind = 'button'; comps[key('button', b.id)] = c; });
     var board = { token: json.token, slots: copy(json.slots || []), comps: comps, original: copy(comps), order: {} };
-    // Order inside each container: regions first by sequence, then items by sequence.
+    // Order inside each container: regions first by sequence, then items and buttons by sequence.
     Object.keys(comps).map(function (k) { return comps[k]; })
-      .sort(function (a, b) { return (a.kind === b.kind ? 0 : a.kind === 'region' ? -1 : 1) || a.seq - b.seq; })
+      .sort(function (a, b) { return (group(a.kind) === group(b.kind) ? 0 : a.kind === 'region' ? -1 : 1) || a.seq - b.seq; })
       .forEach(function (c) { var k = containerOf(c); (board.order[k] = board.order[k] || []).push(key(c.kind, c.id)); });
     return board;
   }
@@ -42,14 +50,15 @@
     return !!(slot && slot.grid);
   }
 
-  // Regions and items make separate rows, as the page's grid does (sub-regions first, then items).
+  // Regions and fields make separate rows, as the page's grid does (sub-regions first, then items
+  // and buttons).
   function rows(board, container) {
     var out = [];
-    ['region', 'item'].forEach(function (kind) {
+    ['region', 'field'].forEach(function (g) {
       var first = true;
       (board.order[container] || []).forEach(function (k) {
         var c = board.comps[k];
-        if (c.kind !== kind) return;
+        if (group(c.kind) !== g) return;
         if (first || c.newRow || !hasGrid(board, container)) out.push([c]); else out[out.length - 1].push(c);
         first = false;
       });
@@ -67,8 +76,8 @@
   }
 
   function renumber(board, container) {
-    var n = { region: 0, item: 0 };
-    (board.order[container] || []).forEach(function (k) { var c = board.comps[k]; c.seq = (n[c.kind] += 10); });
+    var n = { region: 0, field: 0 };
+    (board.order[container] || []).forEach(function (k) { var c = board.comps[k]; c.seq = (n[group(c.kind)] += 10); });
   }
 
   // Runs fn on the board; puts everything back when fn returns a reason.
@@ -93,6 +102,8 @@
     if (!c) return { ok: false, reason: 'Unknown component.' };
     var to = target.container;
     if (kind === 'item' && to.indexOf('region:') !== 0) return { ok: false, reason: 'An item must be inside a region.' };
+    if (kind === 'button' && to.indexOf('region:') !== 0 && to.indexOf('btn:') !== 0) return { ok: false, reason: 'A button must be inside a region.' };
+    if (to.indexOf('btn:') === 0 && !board.comps[key('region', to.split(':')[1])]) return { ok: false, reason: 'Unknown region.' };
     if (kind === 'region' && to.indexOf('slot:') !== 0 && to.indexOf('region:') !== 0) return { ok: false, reason: 'A region must be in a slot or a region.' };
     if (to.indexOf('region:') === 0 && !board.comps[key('region', to.slice(7))]) return { ok: false, reason: 'Unknown region.' };
     if (to.indexOf('slot:') === 0 && !board.slots.some(function (s) { return 'slot:' + s.name === to; })) return { ok: false, reason: 'The page template has no such slot.' };
@@ -100,22 +111,33 @@
 
     return attempt(board, function () {
       var from = containerOf(c);
-      // The box after this one, of the same kind, keeps its row when this one led it.
-      var same = board.order[from].filter(function (x) { return board.comps[x].kind === kind; });
+      // The box after this one, in the same rows, keeps its row when this one led it.
+      var same = board.order[from].filter(function (x) { return group(board.comps[x].kind) === group(kind); });
       var after = board.comps[same[same.indexOf(k) + 1]];
       if (after && (c.newRow || same.indexOf(k) === 0)) after.newRow = true;
       board.order[from] = board.order[from].filter(function (x) { return x !== k; });
       if (kind === 'region') {
         if (to.indexOf('slot:') === 0) { c.parent = null; c.slot = to.slice(5); } else { c.parent = to.slice(7); c.slot = SUB; }
-      } else c.region = to.slice(7);
+      } else if (to.indexOf('btn:') === 0) {
+        var parts = to.split(':'); c.region = parts[1]; c.position = parts.slice(2).join(':');
+      } else {
+        c.region = to.slice(7);
+        if (kind === 'button') c.position = 'BODY';
+      }
       var list = board.order[to] = board.order[to] || [];
-      var at = target.before != null ? list.indexOf(key(kind, target.before)) : -1;
-      if (target.before != null && at < 0) return 'The drop position is not in that container.';
+      // beforeKey names the next box whatever its kind; before is an id of the moved kind.
+      var bk = target.beforeKey != null ? target.beforeKey : target.before != null ? key(kind, target.before) : null;
+      var at = bk != null ? list.indexOf(bk) : -1;
+      if (bk != null && at < 0) return 'The drop position is not in that container.';
       if (hasGrid(board, to)) {
         if (at >= 0) {
           var next = board.comps[list[at]];
-          c.newRow = target.sameRow ? !!next.newRow : true;
-          next.newRow = !target.sameRow;
+          // endOfRow: last on the row before `next`, which keeps starting its own row.
+          if (target.endOfRow) c.newRow = false;
+          else {
+            c.newRow = target.sameRow ? !!next.newRow : true;
+            next.newRow = !target.sameRow;
+          }
         } else c.newRow = !target.sameRow;
       }
       if (at >= 0) list.splice(at, 0, k); else list.push(k);
@@ -132,7 +154,16 @@
     var container = containerOf(c);
     if (!hasGrid(board, container)) return { ok: false, reason: 'This slot does not use the 12-column grid.' };
     if (span != null && !(span === Math.floor(span) && span >= 1 && span <= 12)) return { ok: false, reason: 'A span runs from 1 to 12 columns.' };
-    return attempt(board, function () { c.span = span; return checkRows(board, container); });
+    return attempt(board, function () {
+      c.span = span;
+      var reason = checkRows(board, container);
+      // A box that outgrows a row it does not lead starts a row of its own, as dragging it wider means.
+      if (reason && !c.newRow && rows(board, container).some(function (row) { return row[0] !== c && row.indexOf(c) > 0; })) {
+        c.newRow = true;
+        reason = checkRows(board, container);
+      }
+      return reason;
+    });
   }
 
   function changes(board) {

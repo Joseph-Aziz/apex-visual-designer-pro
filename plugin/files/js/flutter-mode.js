@@ -21,8 +21,16 @@
     selected: null,
     versions: null,
     message: '',
-    busy: false
+    busy: false,
+    usePage: false,      // true: clicks in the preview reach the page (fill items, submit) instead of selecting
+    undo: null,          // undo/redo snapshots of the design (spec §7), one stack per open page
+    lastField: null,     // the field typed in last, so a run of keystrokes is one undo step
+    chartKey: null,      // the chart whose Chart Designer panel is open
+    chartView: { node: 'chart', tab: 'all', level: 'basic', width: 'desktop', point: '' },
+    chartRuntime: null   // text of the chart runtime written into the page, loaded on demand
   };
+  var CHART_FILES = ['chart-schema', 'chart-jet', 'chart-echarts', 'chart-runtime'];
+  var CD = function () { return VD.chartDesigner; };
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -32,8 +40,43 @@
   function setMessage(m) { state.message = m || ''; var el = host && host.querySelector('.fl-msg'); if (el) el.textContent = state.message; }
   function choice(key) { return state.design.components.filter(function (c) { return c.key === key; })[0] || null; }
   function component(key) { return state.components.filter(function (c) { return c.key === key; })[0] || null; }
-  function dirty() { return JSON.stringify(state.design) !== state.savedJson; }
-  function output() { return G().generate({ app: state.app, page: state.page, components: state.design.components }); }
+  // Called before every change of the design. Typing in one field is one step, not one per key.
+  function remember(field) {
+    if (field && field === state.lastField) return;
+    state.lastField = field || null;
+    state.undo.record(JSON.stringify(state.design));
+  }
+  function step(redo) {
+    var now = JSON.stringify(state.design);
+    var snap = redo ? state.undo.redo(now) : state.undo.undo(now);
+    if (snap == null) return;
+    var had = state.design.components.filter(function (c) { return c.chart; }).map(function (c) { return c.key; });
+    state.design = JSON.parse(snap);
+    state.lastField = null;
+    // A chart that lost its design is drawn again by APEX only after a reload of the preview.
+    var lost = had.some(function (k) { var c = choice(k); return !c || !c.chart; });
+    render(lost);
+  }
+
+  function dirty() { return !!state.page && JSON.stringify(state.design) !== state.savedJson; }
+  function output() { return G().generate({ app: state.app, page: state.page, components: state.design.components },
+    { echartsUrl: G().echartsUrl(document.baseURI), chartRuntime: state.chartRuntime }); }
+
+  // The chart runtime is the plug-in's own four files, read once from the designer's folder.
+  var runtimeLoading = null;
+  function loadChartRuntime() {
+    if (state.chartRuntime) return Promise.resolve(state.chartRuntime);
+    if (!runtimeLoading) {
+      runtimeLoading = Promise.all(CHART_FILES.map(function (n) {
+        return fetch(new URL(window.vdAsset('js/' + n + '.js'), document.baseURI).href).then(function (r) {
+          if (!r.ok) throw new Error('Could not load the chart runtime (' + n + '.js: HTTP ' + r.status + ').');
+          return r.text();
+        });
+      })).then(function (parts) { state.chartRuntime = parts.join('\n'); return state.chartRuntime; },
+        function (e) { runtimeLoading = null; throw e; });
+    }
+    return runtimeLoading;
+  }
 
   // ------------------------------------------------------------ loading
   function flatten(res) {
@@ -91,6 +134,7 @@
 
   function attach(app, page) {
     state.app = app; state.page = page; state.selected = null; state.versions = null;
+    state.undo = VD.undoStack.create(100); state.lastField = null;
     setMessage('Loading page ' + app + ':' + page + '…');
     // The pushed theme feeds the Theme style picker; without one (or without access) there is no picker.
     var theme = VD.repository.readTheme(app).then(function (t) { return t.pushed && t.pushed.theme; }, function () { return null; });
@@ -101,17 +145,26 @@
         state.token = r[1].token;
         state.pageCss = r[1].css || '';
         state.pageJs = r[1].js || '';
-        state.design = r[1].design && r[1].design.components ? r[1].design : { components: [] };
-        state.savedJson = JSON.stringify(state.design);
+        var saved = r[1].design && r[1].design.components ? r[1].design : { components: [] };
+        state.savedJson = JSON.stringify(saved);
+        // Old chart looks become Chart Designer settings; the page then shows unsaved changes.
+        state.design = VD.chartMigrate.design(saved).design;
+        state.undo = VD.undoStack.create(100);
+        state.lastField = null;
         state.pushedTheme = r[2] || null;
+        state.chartKey = null;
         setMessage('');
         render(true);
+        if (G().needsChartRuntime(state.design)) {
+          loadChartRuntime().then(function () { applyPreview(); }, function (e) { setMessage(e.message); });
+        }
       })
       .catch(function (e) { setMessage(e.message); render(true); });
   }
 
   // ------------------------------------------------------------ editing
   function setVariant(key, variantId) {
+    remember();
     var c = component(key);
     var list = state.design.components.filter(function (x) { return x.key !== key; });
     if (variantId) {
@@ -127,6 +180,7 @@
   function setValue(key, param, value) {
     var ch = choice(key);
     if (!ch) return;
+    remember(key + ' ' + param);
     ch.values = ch.values || {};
     ch.values[param] = value;
     applyPreview();
@@ -145,10 +199,47 @@
     if (d && out.js && !d.getElementById('vd-flutter-js')) {
       var s = d.createElement('script'); s.id = 'vd-flutter-js'; s.textContent = out.js; d.body.appendChild(s);
     }
+    if (d) scheduleCharts();
     return ok;
   }
 
+  // Charts: the runtime goes into the preview once per page load; every configured chart is
+  // re-applied 150 ms after the last change, so typing in a field does not redraw on each key.
+  var chartTimer = null;
+  function scheduleCharts() {
+    clearTimeout(chartTimer);
+    chartTimer = setTimeout(applyCharts, 150);
+  }
+  function frameChartApi() {
+    var d = frame && VD.pagePreview.doc(frame), w = d && d.defaultView;
+    if (!w || !state.chartRuntime) return null;
+    if (!d.getElementById('vd-chart-rt')) {
+      var s = d.createElement('script');
+      s.id = 'vd-chart-rt';
+      s.textContent = 'window.VD = window.VD || {}; VD.chart = VD.chart || {}; VD.chart.echartsUrl = ' +
+        JSON.stringify(G().echartsUrl(document.baseURI)) + ';\n' +
+        'if (!VD.chart.apply) {\n' + state.chartRuntime + '\n}\n';
+      d.body.appendChild(s);
+    }
+    return w.VD && w.VD.chart && w.VD.chart.apply ? w.VD.chart : null;
+  }
+  function applyCharts() {
+    var list = state.design.components.filter(function (c) { return c.chart && c.staticId; });
+    var api = list.length && frameChartApi();
+    if (!api) return;
+    list.forEach(function (c) {
+      try { api.apply(c.staticId, c.chart); } catch (e) { setMessage('Chart ' + c.staticId + ': ' + e.message); }
+    });
+  }
+  // Series and groups of a chart as APEX drew it in the preview, for the tree and the point list.
+  function chartData(staticId) {
+    var api = frameChartApi(), info = null;
+    try { info = api && api.read(staticId); } catch (e) { info = null; }
+    return info || { type: null, series: [], groups: [] };
+  }
+
   function onFrameClick(ev) {
+    if (state.usePage) return;
     var byId = {};
     state.components.forEach(function (c) {
       if (!c.ftype) return;
@@ -198,6 +289,10 @@
       '<strong class="fl-title">Flutter Designer</strong>' +
       '<span class="lk-state">' + (state.page ? (dirty() ? 'Unsaved changes' : 'Saved') : '') + '</span>' +
       '<span class="lk-spacer"></span>' +
+      '<button class="vd-btn vd-btn--ghost fl-undo" title="Undo (Ctrl+Z)"' + (state.undo && state.undo.canUndo() ? '' : ' disabled') + '>Undo</button>' +
+      '<button class="vd-btn vd-btn--ghost fl-redo" title="Redo (Ctrl+Y)"' + (state.undo && state.undo.canRedo() ? '' : ' disabled') + '>Redo</button>' +
+      '<button class="vd-btn vd-btn--ghost fl-use-page" aria-pressed="' + state.usePage + '" title="Use the page in the preview: fill items and submit, for example to show a chart that needs dates. Turn off to select components again.">' +
+        (state.usePage ? 'Using page: on' : 'Use page') + '</button>' +
       '<label class="lk-inline">App <input type="number" class="fl-app" value="' + esc(state.app) + '"></label>' +
       '<label class="lk-inline">Page <input type="number" class="fl-page" value="' + esc(state.page || '') + '"></label>' +
       '<button class="vd-btn vd-btn--ghost fl-add-app" title="Let the designer work on this application">Add application</button>' +
@@ -214,6 +309,9 @@
       addApp(Number(top.querySelector('.fl-app').value));
     });
     top.querySelector('.fl-history').addEventListener('click', openHistory);
+    top.querySelector('.fl-undo').addEventListener('click', function () { step(false); });
+    top.querySelector('.fl-redo').addEventListener('click', function () { step(true); });
+    top.querySelector('.fl-use-page').addEventListener('click', function () { state.usePage = !state.usePage; render(); });
     top.querySelector('.fl-save').addEventListener('click', save);
   }
 
@@ -224,7 +322,7 @@
       (groups[g] = groups[g] || []).push(c);
     });
     var names = { text: 'Text fields', date: 'Date pickers', select: 'Lists', choice: 'Checkboxes and radios', 'switch': 'Switches',
-      button: 'Buttons', display: 'Display only', region: 'Regions', classic: 'Classic reports', ir: 'Interactive reports', ig: 'Interactive grids', cards: 'Cards', other: 'Not supported' };
+      button: 'Buttons', display: 'Display only', region: 'Regions', classic: 'Classic reports', ir: 'Interactive reports', ig: 'Interactive grids', cards: 'Cards', chart: 'Charts', other: 'Not supported' };
     var order = V().types.concat(['other']);
     var html = state.page ? order.filter(function (g) { return groups[g]; }).map(function (g) {
       return '<h3>' + names[g] + '</h3>' + groups[g].map(function (c) {
@@ -232,7 +330,7 @@
         var ch = choice(c.key);
         return '<button class="lk-slot' + (state.selected === c.key ? ' is-selected' : '') + '" data-key="' + esc(c.key) + '"' +
           (blocked ? ' disabled title="' + esc(blocked) + '"' : '') + '><b>' + esc(c.label) + '</b><span>' +
-          esc(blocked || (c.needsStaticId ? 'set Static ID first' : ch ? V().get(c.ftype, ch.variant).label : 'plain')) + '</span></button>';
+          esc(blocked || (c.needsStaticId ? 'set Static ID first' : ch && ch.chart ? 'Chart Designer' : ch ? V().get(c.ftype, ch.variant).label : 'plain')) + '</span></button>';
       }).join('');
     }).join('') : '<p class="lk-hint">Enter an app and page, then Open page.</p>';
     var left = host.querySelector('.fl-left');
@@ -279,10 +377,97 @@
     });
   }
 
+  // ------------------------------------------------------------ chart designer
+  function setChart(key, cfg, field) {
+    var ch = choice(key);
+    if (!ch) return;
+    remember(field && key + ' ' + field);
+    ch.chart = cfg;
+    // The frame (background, border, radius) is page CSS; applyPreview sets it and redraws the charts.
+    applyPreview();
+    renderTop(); renderLeft();
+  }
+  function openChart(c) {
+    setMessage('Loading the chart runtime…');
+    loadChartRuntime().then(function () {
+      var ch = choice(c.key);
+      if (!ch || !ch.chart) {
+        // A chart design replaces an older look variant on the same chart.
+        remember();
+        state.design.components = state.design.components.filter(function (x) { return x.key !== c.key; });
+        state.design.components.push({ key: c.key, kind: c.kind, name: c.name, staticId: c.staticId || null, type: c.type || null,
+          component: c.component || null, chart: { version: 1, engine: 'jet' } });
+      }
+      state.chartKey = c.key;
+      state.chartView.node = 'chart'; state.chartView.point = '';
+      setMessage('');
+      render();
+    }, function (e) { setMessage(e.message); });
+  }
+  function closeChart() {
+    state.chartKey = null;
+    var f = host.querySelector('.fl-preview'); if (f) f.style.width = '';
+    render();
+  }
+  function renderChartPanel(right, c) {
+    var ch = choice(c.key), view = state.chartView, data = chartData(c.staticId);
+    view.apexType = data.type;
+    right.innerHTML = '<h3>' + esc(c.label) + ' — Chart Designer</h3>' + CD().html(ch.chart, view, data.series, data.groups);
+    host.querySelector('.fl-preview').style.width = CD().WIDTHS[view.width] || '';
+    CD().bind(right, {
+      value: function (path, raw, prop, typing) {
+        if (!prop) return;
+        var r = CD().parse(prop, raw), inp = right.querySelector('[data-path="' + path.replace(/"/g, '\\"') + '"]');
+        if (inp) inp.classList.toggle('is-invalid', !!r.error);
+        if (r.error) { setMessage(r.error); return; }
+        setMessage('');
+        setChart(c.key, CD().set(ch.chart, path, r.value), typing ? path : null);
+        if (!typing) renderChartPanel(right, c);
+      },
+      reset: function (path) { setChart(c.key, CD().set(ch.chart, path, undefined)); renderChartPanel(right, c); },
+      view: function (k, v) { view[k] = v; renderChartPanel(right, c); },
+      engine: function (e) { setChart(c.key, CD().setEngine(ch.chart, e)); renderChartPanel(right, c); },
+      type: function (t) { setChart(c.key, CD().set(ch.chart, 'type', t || undefined)); renderChartPanel(right, c); },
+      template: function (id) {
+        var t = CD().template(id);
+        if (!t || !window.confirm('Replace the settings of this chart with the template? Undo brings them back.')) { renderChartPanel(right, c); return; }
+        setChart(c.key, t); renderChartPanel(right, c);
+      },
+      resetAll: function () {
+        if (!window.confirm('Reset every setting of this chart to how APEX draws it?')) return;
+        setChart(c.key, { version: 1, engine: ch.chart.engine || 'jet' }); renderChartPanel(right, c);
+      },
+      addRef: function () { setChart(c.key, CD().addRef(ch.chart)); renderChartPanel(right, c); },
+      removeRef: function (i) { setChart(c.key, CD().removeRef(ch.chart, i)); renderChartPanel(right, c); },
+      close: closeChart
+    });
+  }
+  function chartEntryHtml(ch) {
+    return '<p class="lk-hint">Style this chart with the Chart Designer: colours, series, axes, labels, legend, reference lines and more, with Oracle JET or ECharts.</p>' +
+      '<button class="vd-btn vd-btn--primary fl-chart-open">' + (ch && ch.chart ? 'Edit chart design' : 'Open Chart Designer') + '</button>' +
+      (ch ? '<p class="lk-hint">Current design: Chart Designer</p>' +
+        '<button class="vd-btn vd-btn--ghost fl-remove">Remove design</button>' : '');
+  }
+
   function renderRight() {
     var right = host.querySelector('.fl-right');
     var c = state.selected && component(state.selected);
     var thumbCss = '';
+    var chartOpen = !!(c && state.chartKey === c.key && choice(c.key) && choice(c.key).chart);
+    host.classList.toggle('fl-chart-open', chartOpen);
+    if (!chartOpen) { state.chartKey = null; host.querySelector('.fl-preview').style.width = ''; }
+    if (chartOpen) { renderChartPanel(right, c); host.querySelector('#fl-thumbs-css').textContent = ''; return; }
+    if (c && c.ftype === 'chart' && !c.needsStaticId) {
+      var cch = choice(c.key);
+      right.innerHTML = '<h3>' + esc(c.label) + '</h3>' + themeStyleHtml(c) + chartEntryHtml(cch);
+      bindThemeStyle(right, c);
+      right.querySelector('.fl-chart-open').addEventListener('click', function () { openChart(c); });
+      var rmc = right.querySelector('.fl-remove');
+      // A reload gives the preview back the chart exactly as APEX draws it.
+      if (rmc) rmc.addEventListener('click', function () { setVariant(c.key, null); loadPreview(); });
+      host.querySelector('#fl-thumbs-css').textContent = '';
+      return;
+    }
     if (!c) {
       right.innerHTML = state.page ? '<p class="lk-hint">Select a component in the list or click it on the page.</p>' : '';
     } else {
@@ -326,12 +511,18 @@
 
   // ------------------------------------------------------------ save and history
   function save() {
+    // Without the runtime text a chart design would be saved with no code to draw it.
+    if (G().needsChartRuntime(state.design) && !state.chartRuntime) {
+      setMessage('The chart runtime is not loaded yet, so chart designs cannot be saved. Wait a moment and try again.');
+      loadChartRuntime().catch(function (e) { setMessage(e.message); });
+      return;
+    }
     var out = output();
     var cssCheck = G().merge(state.pageCss, out.css), jsCheck = G().merge(state.pageJs, out.js);
     if (cssCheck.error || jsCheck.error) { setMessage(cssCheck.error || jsCheck.error); return; }
     state.busy = true; renderTop();
     setMessage('Saving into page ' + state.page + '…');
-    VD.repository.saveFlutter(state.app, state.page, state.token, state.design, out.css, out.js)
+    VD.repository.saveFlutter(state.app, state.page, state.token, VD.chartMigrate.strip(state.design), out.css, out.js)
       .then(function () {
         state.busy = false;
         return attach(state.app, state.page).then(function () { setMessage('Saved into page ' + state.page + '. Its own CSS and JS outside the designer block are unchanged.'); });
@@ -376,6 +567,16 @@
       });
     }).catch(function (e) { setMessage(e.message); });
   }
+
+  // Ctrl+Z / Ctrl+Y (and Ctrl+Shift+Z) while the designer is shown; fields keep their own undo.
+  document.addEventListener('keydown', function (e) {
+    if (!host || !host.offsetParent || !state.undo || !(e.ctrlKey || e.metaKey)) return;
+    var tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
+    var k = e.key.toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); step(false); }
+    else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); step(true); }
+  });
 
   window.VD.flutterMode = {
     enter: function () {

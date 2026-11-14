@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Builds plugin/region_type_plugin_apex_visual_designer.sql: an APEX 26.2 plug-in export with
+/* Builds plugin/region_type_plugin_apex_visual_designer.sql: a plug-in export in the APEX 24.2 format (imports into 24.2 and later) with
    every file under plugin/files as a plug-in file. No dependencies beyond Node itself.
    Usage: node tools/build_plugin.js [--version 1.0.0] [--out <file>] */
 const fs = require('fs');
@@ -10,7 +10,7 @@ const ROOT = path.join(__dirname, '..');
 const FILES = path.join(ROOT, 'plugin', 'files');
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf('--' + name); return i >= 0 ? args[i + 1] : def; };
-const VERSION = opt('version', '1.2.0');
+const VERSION = opt('version', '1.2.11');
 const OUT = opt('out', path.join(ROOT, 'plugin', 'region_type_plugin_apex_visual_designer.sql'));
 const NAME = 'COM.APEXVD.VISUAL_DESIGNER';
 
@@ -96,8 +96,8 @@ whenever sqlerror exit sql.sqlcode rollback
 --------------------------------------------------------------------------------
 begin
 wwv_flow_imp.import_begin (
- p_version_yyyy_mm_dd=>'2026.04.07'
-,p_release=>'26.2.0'
+ p_version_yyyy_mm_dd=>'2024.11.30'
+,p_release=>'24.2.0'
 ,p_default_workspace_id=>1000
 ,p_default_application_id=>100
 ,p_default_id_offset=>0

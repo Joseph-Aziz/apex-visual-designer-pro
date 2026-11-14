@@ -41,9 +41,15 @@ BEGIN
   LOOP
     l_next := DBMS_LOB.INSTR(l_text, CHR(10) || c_vd_mark || CHR(10), l_pos);
     EXIT WHEN l_next = 0;
-    l_stmt := TRIM(DBMS_LOB.SUBSTR(l_text, l_next - l_pos, l_pos));
+    -- DBMS_LOB.SUBSTR returns a VARCHAR2 and gives NULL for more than 32767 characters, which
+    -- skipped big package bodies without a word; a copy keeps statements of any length.
+    l_stmt := NULL;
+    IF l_next > l_pos THEN
+      DBMS_LOB.CREATETEMPORARY(l_stmt, TRUE);
+      DBMS_LOB.COPY(l_stmt, l_text, l_next - l_pos, 1, l_pos);
+    END IF;
     l_pos := l_next + LENGTH(c_vd_mark) + 2;
-    IF l_stmt IS NOT NULL THEN
+    IF l_stmt IS NOT NULL AND TRIM(DBMS_LOB.SUBSTR(l_stmt, 200, 1)) IS NOT NULL THEN
       l_n := l_n + 1;
       BEGIN
         EXECUTE IMMEDIATE l_stmt;
@@ -56,6 +62,19 @@ BEGIN
   IF l_n = 0 THEN
     RETURN 'Install script install/vd-install.sql is empty.';
   END IF;
+  -- Recompile packages left invalid by an earlier install: CREATE OR REPLACE with unchanged source
+  -- does not rebuild them, and their dependencies may only exist now.
+  FOR o IN (SELECT OBJECT_NAME, OBJECT_TYPE FROM USER_OBJECTS
+             WHERE OBJECT_NAME LIKE 'PKG\_VD\_%' ESCAPE '\' AND STATUS <> 'VALID'
+               AND OBJECT_TYPE IN ('PACKAGE', 'PACKAGE BODY')
+             ORDER BY OBJECT_TYPE) LOOP
+    BEGIN
+      EXECUTE IMMEDIATE 'ALTER PACKAGE ' || DBMS_ASSERT.ENQUOTE_NAME(o.OBJECT_NAME)
+        || CASE o.OBJECT_TYPE WHEN 'PACKAGE BODY' THEN ' COMPILE BODY' ELSE ' COMPILE' END;
+    EXCEPTION
+      WHEN OTHERS THEN NULL; -- a compile with errors raises; the check below reports it
+    END;
+  END LOOP;
   -- A package with compile errors must not be recorded as installed.
   FOR o IN (SELECT OBJECT_NAME, OBJECT_TYPE FROM USER_OBJECTS
              WHERE OBJECT_NAME LIKE 'PKG\_VD\_%' ESCAPE '\' AND STATUS <> 'VALID') LOOP

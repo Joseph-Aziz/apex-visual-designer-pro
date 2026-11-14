@@ -83,3 +83,15 @@ assert.ok(sql.includes('IF SQLCODE <> -955 THEN RAISE; END IF;'), 'ignores ORA-0
 assert.ok(sql.includes("STATUS <> ''VALID''"), 'checks packages compiled');
 assert.ok(sql.includes('apex_application.g_edit_cookie_session_id IS NULL'), 'hides detail from non-developers');
 console.log('build_plugin_test review fixes: passed');
+// packages left invalid by an earlier install (same source, so not rebuilt) are recompiled before the check
+const boot = fs.readFileSync('plugin/bootstrap.sql', 'utf8');
+assert.ok(/ALTER PACKAGE [\s\S]{0,120}COMPILE BODY/.test(boot), 'bootstrap recompiles invalid packages');
+assert.ok(boot.indexOf('COMPILE') < boot.indexOf('did not compile'), 'recompile runs before the validity check');
+console.log('build_plugin_test: recompile checks passed');
+// The bootstrap must not cut statements with DBMS_LOB.SUBSTR: it gives NULL past 32767 characters,
+// and the install would skip a big package body without an error.
+{
+  const boot = require('fs').readFileSync('plugin/bootstrap.sql', 'utf8');
+  require('assert').ok(!/l_stmt\s*:=\s*TRIM\(DBMS_LOB\.SUBSTR/.test(boot) && /DBMS_LOB\.COPY\(l_stmt/.test(boot), 'bootstrap copies each statement as a CLOB');
+  console.log('build_plugin_test: long statements passed');
+}

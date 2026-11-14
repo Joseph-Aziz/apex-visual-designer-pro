@@ -23,7 +23,8 @@ walk(ROOT, []).filter((f) => !SKIP.has(f)).forEach((f) => {
   const text = fs.readFileSync(path.join(ROOT, f), 'utf8');
   VALUES.forEach((v) => { if (text.includes(v)) found.push(f + ': ' + v); });
   // The generated plug-in export numbers its hex lines, so 144 appears there by chance.
-  const numbered = f === 'plugin/region_type_plugin_apex_visual_designer.sql';
+  // Third-party libraries under plugin/files/lib ship as released; 144 is just a number there.
+  const numbered = f === 'plugin/region_type_plugin_apex_visual_designer.sql' || f.startsWith('plugin/files/lib/');
   if (/\.(js|sql)$/.test(f) && !numbered && /\b144\b/.test(text)) found.push(f + ': 144');
 });
 assert.deepStrictEqual(found, [], 'environment values found:\n' + found.join('\n'));

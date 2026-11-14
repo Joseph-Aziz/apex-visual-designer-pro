@@ -440,6 +440,14 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
       'p_begin_on_new_field', 'p_grid_column', 'p_colspan');
   END item_args;
 
+  -- p_button_position is left out of the export for body buttons, and the grid flags when they
+  -- hold their defaults, so the writer always gives all of them.
+  FUNCTION button_args RETURN apex_t_varchar2 IS
+  BEGIN
+    RETURN apex_t_varchar2('p_button_sequence', 'p_button_plug_id', 'p_button_position',
+      'p_grid_new_row', 'p_grid_new_column', 'p_grid_column', 'p_grid_column_span');
+  END button_args;
+
   PROCEDURE refuse(p_reason IN VARCHAR2) IS
   BEGIN
     RAISE_APPLICATION_ERROR(-20243, p_reason || ' Nothing was changed.');
@@ -485,7 +493,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
       l_ch := TREAT(p_changes.get(i) AS JSON_OBJECT_T);
       l_kind := l_ch.get_string('kind');
       l_id := TO_CHAR(id_value(l_ch, 'id'));
-      IF l_kind IS NULL OR l_kind NOT IN ('region', 'item') OR l_id IS NULL THEN refuse('A change is not valid.'); END IF;
+      IF l_kind IS NULL OR l_kind NOT IN ('region', 'item', 'button') OR l_id IS NULL THEN refuse('A change is not valid.'); END IF;
       IF NOT l_ch.has('seq') OR l_ch.get_number('seq') IS NULL OR l_ch.get_number('seq') < 0 THEN
         refuse('A change is not valid.');
       END IF;
@@ -516,8 +524,15 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
           ELSE
             l_prev.put('region', l_comp.get('region'));
             l_ref := id_value(l_ch, 'region');
-            IF l_ref IS NULL THEN refuse('An item must be inside a region.'); END IF;
+            IF l_ref IS NULL THEN refuse('An ' || l_kind || ' must be inside a region.'); END IF;
             l_comp.put('region', TO_CHAR(l_ref));
+            IF l_kind = 'button' THEN
+              l_prev.put('position', l_comp.get('position'));
+              IF NOT REGEXP_LIKE(l_ch.get_string('position'), '^[A-Z0-9_]{1,30}$') THEN
+                refuse('That button position is not valid.');
+              END IF;
+              l_comp.put('position', l_ch.get_string('position'));
+            END IF;
           END IF;
           l_prev.put('seq', l_comp.get('seq'));
           l_prev.put('newRow', l_comp.get('newRow'));
@@ -552,6 +567,10 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
       SELECT * FROM JSON_TABLE(l_state, '$.items[*]' COLUMNS (
         id VARCHAR2(40) PATH '$.id', region VARCHAR2(40) PATH '$.region',
         seq NUMBER PATH '$.seq', new_row VARCHAR2(5) PATH '$.newRow', span NUMBER PATH '$.span'))
+    ), b AS (
+      SELECT * FROM JSON_TABLE(l_state, '$.buttons[*]' COLUMNS (
+        id VARCHAR2(40) PATH '$.id', region VARCHAR2(40) PATH '$.region', position VARCHAR2(30) PATH '$.position',
+        seq NUMBER PATH '$.seq', new_row VARCHAR2(5) PATH '$.newRow', span NUMBER PATH '$.span'))
     ), changed AS (
       SELECT column_value k FROM TABLE(l_changed)
     ), cyc AS (
@@ -566,7 +585,12 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
              CASE WHEN r.parent IS NULL THEN 'slot:' || r.slot ELSE 'region:' || r.parent END cont,
              r.seq, r.new_row, r.span FROM r
       UNION ALL
-      SELECT 'item:' || i.id, 'item', 'region:' || i.region, i.seq, i.new_row, i.span FROM i
+      -- Items and body buttons share rows; other buttons sit outside the grid.
+      SELECT 'item:' || i.id, 'field', 'region:' || i.region, i.seq, i.new_row, i.span FROM i
+      UNION ALL
+      SELECT 'button:' || b.id, 'field',
+             CASE WHEN b.position = 'BODY' THEN 'region:' ELSE 'btn:' || b.position || ':' END || b.region,
+             b.seq, b.new_row, b.span FROM b
     ), grid AS (
       SELECT DISTINCT c.cont FROM comps c
         LEFT JOIN roots ro ON c.cont = 'region:' || ro.id
@@ -590,6 +614,9 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
       WHEN EXISTS (SELECT 1 FROM i JOIN changed ON changed.k = 'item:' || i.id
                     WHERE i.region NOT IN (SELECT id FROM r))
         THEN 'An item must be inside a region.'
+      WHEN EXISTS (SELECT 1 FROM b JOIN changed ON changed.k = 'button:' || b.id
+                    WHERE b.region NOT IN (SELECT id FROM r))
+        THEN 'A button must be inside a region.'
       WHEN EXISTS (SELECT 1 FROM numbered GROUP BY cont, kind, row_no HAVING SUM(NVL(span, 0)) > 12)
         THEN 'A row cannot be wider than 12 columns.'
       END
@@ -628,6 +655,17 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
           || CASE WHEN num('span') IS NOT NULL THEN CHR(10) || ',p_plug_grid_column_span=>' || num('span') END;
         l_src := edit_call(l_src, 'wwv_flow_imp_page.create_page_plug(' || CHR(10)
           || ' p_id=>wwv_flow_imp.id(' || id_value(l_c, 'id') || ')', region_args, l_add);
+      ELSIF l_c.get_string('kind') = 'button' THEN
+        IF NOT REGEXP_LIKE(l_c.get_string('position'), '^[A-Z0-9_]{1,30}$') THEN refuse('That button position is not valid.'); END IF;
+        l_add := CHR(10) || ',p_button_sequence=>' || num('seq')
+          || CHR(10) || ',p_button_plug_id=>wwv_flow_imp.id(' || id_value(l_c, 'region') || ')'
+          || CHR(10) || ',p_button_position=>''' || l_c.get_string('position') || ''''
+          || CHR(10) || ',p_grid_new_row=>''' || CASE WHEN is_false('newRow') THEN 'N' ELSE 'Y' END || ''''
+          || CHR(10) || ',p_grid_new_column=>''' || CASE WHEN is_false('newCol') THEN 'N' ELSE 'Y' END || ''''
+          || CASE WHEN num('colStart') IS NOT NULL THEN CHR(10) || ',p_grid_column=>' || num('colStart') END
+          || CASE WHEN num('span') IS NOT NULL THEN CHR(10) || ',p_grid_column_span=>' || num('span') END;
+        l_src := edit_call(l_src, 'wwv_flow_imp_page.create_page_button(' || CHR(10)
+          || ' p_id=>wwv_flow_imp.id(' || id_value(l_c, 'id') || ')', button_args, l_add);
       ELSE
         l_add := CHR(10) || ',p_item_sequence=>' || num('seq')
           || CHR(10) || ',p_item_plug_id=>wwv_flow_imp.id(' || id_value(l_c, 'region') || ')'
@@ -679,11 +717,14 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
   FUNCTION apply_layout(p_app IN NUMBER, p_page IN NUMBER, p_token IN VARCHAR2, p_changes IN CLOB,
                         p_fail_after_import IN BOOLEAN DEFAULT FALSE) RETURN VARCHAR2 IS
     l_old JSON_ARRAY_T;
+    l_txt CLOB;
     l_ws  NUMBER := APEX_APPLICATION.GET_SECURITY_GROUP_ID;
   BEGIN
     l_old := write_layout(p_app, p_page, p_token, p_changes, p_fail_after_import);
+    -- SQL cannot call a JSON object type's methods (ORA-40573), so the text is taken first.
+    l_txt := l_old.to_clob;
     INSERT INTO VD_LAYOUT_VERSIONS (WORKSPACE_ID, APP_ID, PAGE_ID, CHANGES, SAVED_BY)
-    VALUES (l_ws, p_app, p_page, l_old.to_clob,
+    VALUES (l_ws, p_app, p_page, l_txt,
             COALESCE(SYS_CONTEXT('APEX$SESSION', 'APP_USER'), SYS_CONTEXT('USERENV', 'SESSION_USER')));
     DELETE FROM VD_LAYOUT_VERSIONS
      WHERE WORKSPACE_ID = l_ws AND APP_ID = p_app AND PAGE_ID = p_page

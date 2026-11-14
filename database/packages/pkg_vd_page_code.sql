@@ -190,18 +190,67 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_CODE AS
        ORDER BY VERSION_ID DESC;
     RETURN l_cur;
   END list_versions;
+  -- The page's regions, items and region buttons as JSON arrays: the rows the layout board shows
+  -- and Apply changes. Buttons without a region are page-level and stay off the board.
+  PROCEDURE layout_rows(p_app IN NUMBER, p_page IN NUMBER, p_regions OUT CLOB, p_items OUT CLOB,
+                        p_buttons OUT CLOB) IS
+  BEGIN
+    SELECT JSON_ARRAYAGG(JSON_OBJECT(
+             'id' VALUE TO_CHAR(REGION_ID), 'title' VALUE COALESCE(REGION_NAME, TITLE), 'parent' VALUE TO_CHAR(PARENT_REGION_ID),
+             'slot' VALUE DISPLAY_POSITION_CODE, 'seq' VALUE DISPLAY_SEQUENCE,
+             'newRow' VALUE CASE WHEN NEW_GRID_ROW = 'No' THEN 'false' ELSE 'true' END FORMAT JSON,
+             'newCol' VALUE CASE WHEN NEW_GRID_COLUMN = 'No' THEN 'false' ELSE 'true' END FORMAT JSON,
+             'colStart' VALUE GRID_COLUMN, 'span' VALUE GRID_COLUMN_SPAN,
+             'hidden' VALUE CASE WHEN CONDITION_TYPE_CODE = 'NEVER' THEN 'true' ELSE 'false' END FORMAT JSON
+             NULL ON NULL)
+             ORDER BY DISPLAY_SEQUENCE, REGION_ID RETURNING CLOB)
+      INTO p_regions
+      FROM APEX_APPLICATION_PAGE_REGIONS
+     WHERE APPLICATION_ID = p_app AND PAGE_ID = p_page;
+
+    SELECT JSON_ARRAYAGG(JSON_OBJECT(
+             'id' VALUE TO_CHAR(ITEM_ID), 'name' VALUE ITEM_NAME, 'label' VALUE LABEL,
+             'region' VALUE TO_CHAR(REGION_ID), 'seq' VALUE DISPLAY_SEQUENCE,
+             'newRow' VALUE CASE WHEN BEGINS_ON_NEW_ROW = 'No' THEN 'false' ELSE 'true' END FORMAT JSON,
+             'newCol' VALUE CASE WHEN BEGINS_ON_NEW_CELL = 'No' THEN 'false' ELSE 'true' END FORMAT JSON,
+             'colStart' VALUE GRID_COLUMN, 'span' VALUE COLUMN_SPAN, 'type' VALUE DISPLAY_AS_CODE,
+             'hidden' VALUE CASE WHEN CONDITION_TYPE_CODE = 'NEVER' THEN 'true' ELSE 'false' END FORMAT JSON
+             NULL ON NULL)
+             ORDER BY DISPLAY_SEQUENCE, ITEM_ID RETURNING CLOB)
+      INTO p_items
+      FROM APEX_APPLICATION_PAGE_ITEMS
+     WHERE APPLICATION_ID = p_app AND PAGE_ID = p_page;
+
+    SELECT JSON_ARRAYAGG(JSON_OBJECT(
+             'id' VALUE TO_CHAR(BUTTON_ID), 'name' VALUE BUTTON_NAME, 'label' VALUE LABEL,
+             'region' VALUE TO_CHAR(REGION_ID), 'position' VALUE DISPLAY_POSITION_CODE,
+             'seq' VALUE BUTTON_SEQUENCE,
+             'newRow' VALUE CASE WHEN NEW_GRID_ROW = 'No' THEN 'false' ELSE 'true' END FORMAT JSON,
+             'newCol' VALUE CASE WHEN NEW_GRID_COLUMN = 'No' THEN 'false' ELSE 'true' END FORMAT JSON,
+             'colStart' VALUE GRID_COLUMN, 'span' VALUE GRID_COLUMN_SPAN,
+             'hidden' VALUE CASE WHEN CONDITION_TYPE_CODE = 'NEVER' THEN 'true' ELSE 'false' END FORMAT JSON
+             NULL ON NULL)
+             ORDER BY BUTTON_SEQUENCE, BUTTON_ID RETURNING CLOB)
+      INTO p_buttons
+      FROM APEX_APPLICATION_PAGE_BUTTONS
+     WHERE APPLICATION_ID = p_app AND PAGE_ID = p_page AND REGION_ID IS NOT NULL;
+  END layout_rows;
+
+  -- A hash of the page's region and item layout. LAST_UPDATED_ON is not used: pages written
+  -- through the import API keep it empty, which made every Apply fail as "Page changed".
   FUNCTION layout_token(p_app IN NUMBER, p_page IN NUMBER) RETURN VARCHAR2 IS
-    l_token VARCHAR2(100);
+    l_n       PLS_INTEGER;
+    l_regions CLOB;
+    l_items   CLOB;
+    l_buttons CLOB;
   BEGIN
     PKG_VD_DESIGN_API.assert_target_app(p_app);
-    SELECT TO_CHAR(LAST_UPDATED_ON, 'YYYYMMDDHH24MISS')
-      INTO l_token
-      FROM APEX_APPLICATION_PAGES
-     WHERE APPLICATION_ID = p_app AND PAGE_ID = p_page;
-    RETURN l_token;
-  EXCEPTION
-    WHEN NO_DATA_FOUND THEN
+    SELECT COUNT(*) INTO l_n FROM APEX_APPLICATION_PAGES WHERE APPLICATION_ID = p_app AND PAGE_ID = p_page;
+    IF l_n = 0 THEN
       RAISE_APPLICATION_ERROR(-20233, 'Page ' || p_page || ' does not exist in application ' || p_app || '.');
+    END IF;
+    layout_rows(p_app, p_page, l_regions, l_items, l_buttons);
+    RETURN code_token(l_regions, l_items || CHR(1) || l_buttons);
   END layout_token;
 
   FUNCTION layout_json(p_app IN NUMBER, p_page IN NUMBER) RETURN CLOB IS
@@ -221,53 +270,53 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_CODE AS
     l_slots CLOB;
     l_regions CLOB;
     l_items CLOB;
+    l_buttons CLOB;
     l_out CLOB;
   BEGIN
-    SELECT JSON_ARRAYAGG(JSON_OBJECT('name' VALUE dp.PLACEHOLDER, 'label' VALUE dp.NAME,
-             'grid' VALUE CASE WHEN dp.HAS_GRID_SUPPORT = 'Yes' THEN 'true' ELSE 'false' END FORMAT JSON)
-             ORDER BY dp.PLACEHOLDER RETURNING CLOB)
+    -- Templates are matched by name, preferring the current theme: an app's templates may sit under
+    -- another theme number, and one theme may hold two templates of the same name (slots are merged).
+    -- Positions used by the page's top regions but missing from the template are listed too, so
+    -- every region shows on the board.
+    WITH pg AS (
+      SELECT COALESCE(p.PAGE_TEMPLATE, CASE p.PAGE_MODE WHEN 'Normal' THEN th.DEFAULT_PAGE_TEMPLATE
+               ELSE th.DEFAULT_DIALOG_TEMPLATE END) tname, th.THEME_NUMBER theme
+        FROM APEX_APPLICATION_PAGES p
+        LEFT JOIN APEX_APPLICATION_THEMES th ON th.APPLICATION_ID = p.APPLICATION_ID AND th.IS_CURRENT = 'Yes'
+       WHERE p.APPLICATION_ID = p_app AND p.PAGE_ID = p_page),
+    tpl AS (
+      SELECT t.TEMPLATE_ID, DENSE_RANK() OVER (ORDER BY CASE WHEN t.THEME_NUMBER = pg.theme THEN 0 ELSE 1 END,
+               t.THEME_NUMBER) rk
+        FROM APEX_APPLICATION_TEMP_PAGE t JOIN pg ON t.TEMPLATE_NAME = pg.tname
+       WHERE t.APPLICATION_ID = p_app),
+    dps AS (
+      SELECT dp.PLACEHOLDER name, MAX(dp.NAME) label,
+             MAX(CASE WHEN dp.HAS_GRID_SUPPORT = 'Yes' THEN 1 ELSE 0 END) grid
+        FROM APEX_APPL_TEMP_PAGE_DP dp JOIN tpl ON tpl.TEMPLATE_ID = dp.PAGE_TEMPLATE_ID AND tpl.rk = 1
+       WHERE dp.APPLICATION_ID = p_app
+       GROUP BY dp.PLACEHOLDER),
+    used AS (
+      SELECT DISTINCT r.DISPLAY_POSITION_CODE name
+        FROM APEX_APPLICATION_PAGE_REGIONS r
+       WHERE r.APPLICATION_ID = p_app AND r.PAGE_ID = p_page AND r.PARENT_REGION_ID IS NULL
+         AND r.DISPLAY_POSITION_CODE IS NOT NULL
+         AND r.DISPLAY_POSITION_CODE NOT IN (SELECT name FROM dps)),
+    all_slots AS (
+      SELECT name, label, grid FROM dps
+      UNION ALL
+      SELECT name, name, CASE WHEN name = 'BODY' THEN 1 ELSE 0 END FROM used)
+    SELECT JSON_ARRAYAGG(JSON_OBJECT('name' VALUE name, 'label' VALUE label,
+             'grid' VALUE CASE WHEN grid = 1 THEN 'true' ELSE 'false' END FORMAT JSON)
+             ORDER BY name RETURNING CLOB)
       INTO l_slots
-      FROM APEX_APPLICATION_PAGES p
-      JOIN APEX_APPLICATION_THEMES th
-        ON th.APPLICATION_ID = p.APPLICATION_ID AND th.IS_CURRENT = 'Yes'
-      JOIN APEX_APPLICATION_TEMP_PAGE t
-        ON t.APPLICATION_ID = p.APPLICATION_ID AND t.THEME_NUMBER = th.THEME_NUMBER
-       AND t.TEMPLATE_NAME = COALESCE(p.PAGE_TEMPLATE,
-             CASE p.PAGE_MODE WHEN 'Normal' THEN th.DEFAULT_PAGE_TEMPLATE ELSE th.DEFAULT_DIALOG_TEMPLATE END)
-      JOIN APEX_APPL_TEMP_PAGE_DP dp
-        ON dp.APPLICATION_ID = p.APPLICATION_ID AND dp.PAGE_TEMPLATE_ID = t.TEMPLATE_ID
-     WHERE p.APPLICATION_ID = p_app AND p.PAGE_ID = p_page;
+      FROM all_slots;
 
-    SELECT JSON_ARRAYAGG(JSON_OBJECT(
-             'id' VALUE TO_CHAR(REGION_ID), 'title' VALUE TITLE, 'parent' VALUE TO_CHAR(PARENT_REGION_ID),
-             'slot' VALUE DISPLAY_POSITION_CODE, 'seq' VALUE DISPLAY_SEQUENCE,
-             'newRow' VALUE CASE WHEN NEW_GRID_ROW = 'No' THEN 'false' ELSE 'true' END FORMAT JSON,
-             'newCol' VALUE CASE WHEN NEW_GRID_COLUMN = 'No' THEN 'false' ELSE 'true' END FORMAT JSON,
-             'colStart' VALUE GRID_COLUMN, 'span' VALUE GRID_COLUMN_SPAN,
-             'hidden' VALUE CASE WHEN CONDITION_TYPE_CODE = 'NEVER' THEN 'true' ELSE 'false' END FORMAT JSON
-             NULL ON NULL)
-             ORDER BY DISPLAY_SEQUENCE RETURNING CLOB)
-      INTO l_regions
-      FROM APEX_APPLICATION_PAGE_REGIONS
-     WHERE APPLICATION_ID = p_app AND PAGE_ID = p_page;
-
-    SELECT JSON_ARRAYAGG(JSON_OBJECT(
-             'id' VALUE TO_CHAR(ITEM_ID), 'name' VALUE ITEM_NAME, 'label' VALUE LABEL,
-             'region' VALUE TO_CHAR(REGION_ID), 'seq' VALUE DISPLAY_SEQUENCE,
-             'newRow' VALUE CASE WHEN BEGINS_ON_NEW_ROW = 'No' THEN 'false' ELSE 'true' END FORMAT JSON,
-             'newCol' VALUE CASE WHEN BEGINS_ON_NEW_CELL = 'No' THEN 'false' ELSE 'true' END FORMAT JSON,
-             'colStart' VALUE GRID_COLUMN, 'span' VALUE COLUMN_SPAN, 'type' VALUE DISPLAY_AS_CODE,
-             'hidden' VALUE CASE WHEN CONDITION_TYPE_CODE = 'NEVER' THEN 'true' ELSE 'false' END FORMAT JSON
-             NULL ON NULL)
-             ORDER BY DISPLAY_SEQUENCE RETURNING CLOB)
-      INTO l_items
-      FROM APEX_APPLICATION_PAGE_ITEMS
-     WHERE APPLICATION_ID = p_app AND PAGE_ID = p_page;
+    layout_rows(p_app, p_page, l_regions, l_items, l_buttons);
 
     SELECT JSON_OBJECT('token' VALUE l_token,
              'slots' VALUE COALESCE(l_slots, TO_CLOB('[]')) FORMAT JSON,
              'regions' VALUE COALESCE(l_regions, TO_CLOB('[]')) FORMAT JSON,
-             'items' VALUE COALESCE(l_items, TO_CLOB('[]')) FORMAT JSON RETURNING CLOB)
+             'items' VALUE COALESCE(l_items, TO_CLOB('[]')) FORMAT JSON,
+             'buttons' VALUE COALESCE(l_buttons, TO_CLOB('[]')) FORMAT JSON RETURNING CLOB)
       INTO l_out FROM DUAL;
     RETURN l_out;
   END layout_json;

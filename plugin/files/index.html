@@ -60,7 +60,7 @@
 
 <script>
   // Loaded in this order with document.write so each runs before the next, as plain tags would.
-  ['look-selectors', 'page-preview', 'flutter-variants', 'flutter-codegen', 'repository', 'layout-model', 'layout-mode', 'fl-params', 'flutter-mode', 'theme-codegen', 'theme-mode', 'app'].forEach(function (name) {
+  ['look-selectors', 'page-preview', 'flutter-variants', 'flutter-codegen', 'repository', 'layout-model', 'layout-mode', 'fl-params', 'chart-schema', 'chart-designer', 'chart-migrate', 'undo-stack', 'flutter-mode', 'theme-codegen', 'theme-mode', 'app'].forEach(function (name) {
     document.write('<script src="' + vdAsset('js/' + name + '.js') + '"><\/script>');
   });
 </script>

@@ -11,7 +11,7 @@ const msg = { textContent: '' };
 const host = { querySelector: (s) => (s === '.fl-msg' ? msg : null) };
 const window = { confirm: () => true };
 window.parent = { apex: parentApex };
-const ctx = { window, JSON, Promise, document: { getElementById: (id) => (id === 'flutter-host' ? host : null) } };
+const ctx = { window, JSON, Promise, document: { getElementById: (id) => (id === 'flutter-host' ? host : null), addEventListener() {} } };
 ['plugin/files/js/look-selectors.js', 'plugin/files/js/flutter-variants.js', 'plugin/files/js/flutter-codegen.js',
   'plugin/files/js/fl-params.js', 'plugin/files/js/repository.js', 'plugin/files/js/flutter-mode.js'].forEach((f) =>
   vm.runInNewContext(fs.readFileSync(f, 'utf8'), ctx, { filename: f }));

@@ -953,6 +953,12 @@ textarea.vd-inp{height:auto;padding:7px 8px;line-height:1.5;resize:vertical}
 .lb-empty{color:var(--muted);font-size:12px;padding:6px}
 .lb-box{position:relative;min-width:0;padding:4px 8px;border:1px solid var(--border);border-radius:5px;background:var(--surface);cursor:grab}
 .lb-box.lb-region{border-left:3px solid var(--navy)}
+.lb-box.lb-button{border-left:3px solid var(--muted);border-radius:12px}
+.lb-strip{margin-top:4px;padding:3px 6px;border:1px dashed var(--border);border-radius:5px}
+.lb-strip-label{font-size:11px;opacity:.7}
+.lb-strip .lb-container{margin-top:2px}
+.lb-strip .lb-container:not(.is-grid){display:flex;flex-wrap:wrap;gap:4px}
+.lb-strip .lb-list{flex-direction:row;margin-bottom:0}
 .lb-box.is-changed{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
 .lb-box.is-hidden{opacity:.55;border-style:dashed}
 .lb-box.is-selected,.lb-box:focus-visible{outline:2px solid var(--navy);outline-offset:1px}
@@ -961,6 +967,33 @@ textarea.vd-inp{height:auto;padding:7px 8px;line-height:1.5;resize:vertical}
 .lb-meta{margin-left:auto;color:var(--muted);font-size:11px;white-space:nowrap}
 .lb-box .lb-container{margin-top:4px}
 .lb-handle{position:absolute;top:0;right:-3px;width:6px;height:100%;cursor:ew-resize}
-.vd-dropline{position:absolute;background:var(--navy);pointer-events:none;border-radius:2px;z-index:5}
+.vd-dropline{position:absolute;background:#1a73e8;box-shadow:0 0 0 2px #fff,0 0 8px 2px rgba(26,115,232,.7);pointer-events:none;border-radius:2px;z-index:5}
 .vd-dropline.is-refused{background:var(--danger)}
 @media (max-width:900px){.lb-body{grid-template-columns:1fr}.lb-preview{min-height:320px}}
+/* layout board preview modes */
+.lb-body[data-pv="hidden"],.lb-body[data-pv="popout"]{grid-template-columns:1fr}
+.lb-body[data-pv="hidden"] .lb-preview,.lb-body[data-pv="popout"] .lb-preview{display:none}
+.lb-body[data-pv="expanded"]{grid-template-columns:1fr}
+.lb-body[data-pv="expanded"] .lb-board{display:none}
+.lb-body[data-pv="expanded"] .lb-preview{min-height:70vh}
+.lb-pvsize{width:110px}
+
+.lb-droptarget{outline:2px dashed #1a73e8;outline-offset:1px}
+
+/* Chart Designer panel (inside the Flutter Designer) */
+.fl-chart-open .lk-body{grid-template-columns:200px minmax(0,1fr) 460px}
+.fl-chart-open .fl-preview{margin:0 auto;max-width:100%}
+.cd-head{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-bottom:8px;font-size:12px}
+.cd-tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.cd-tabs button{border:0;background:none;padding:6px 8px;font-size:12px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent}
+.cd-tabs button[aria-selected=true]{color:inherit;border-bottom-color:currentColor}
+.cd-cols{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px}
+.cd-tree{display:flex;flex-direction:column;gap:2px}
+.cd-tree button{text-align:left;border:0;background:none;padding:5px 6px;border-radius:4px;font-size:12px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cd-tree button.is-selected{background:var(--border)}
+.cd-fields h3{margin-top:0}
+.cd-ctl{display:inline-flex;align-items:center;gap:4px}
+.cd-reset{inline-size:20px;block-size:20px;padding:0;border:1px solid var(--border);border-radius:50%;background:var(--surface);cursor:pointer;line-height:1;font-size:13px}
+.cd-field.is-disabled{opacity:.5}
+.cd-ref{border:1px solid var(--border);border-radius:6px;margin:0 0 8px;padding:4px 8px}
+.cd-ref legend{font-size:12px;display:flex;gap:6px;align-items:center}

@@ -52,8 +52,8 @@
     var span = c.span || autoSpan;
     var style = grid ? ' style="grid-column:span ' + span + '"' : '';
     var name = c.kind === 'region' ? (c.title || 'Region ' + c.id) : (c.label || c.name);
-    var meta = (c.kind === 'item' ? c.name + ' · ' : '') + (grid ? (c.span ? c.span + ' col' : 'auto') : '');
-    var inner = c.kind === 'region' ? containerHtml('region:' + c.id, changed) : '';
+    var meta = (c.kind !== 'region' ? c.name + ' · ' : '') + (grid ? (c.span ? c.span + ' col' : 'auto') : '');
+    var inner = c.kind === 'region' ? containerHtml('region:' + c.id, changed) + stripsHtml(c.id, changed) : '';
     return '<div class="' + cls + '"' + style + ' draggable="true" tabindex="0" data-key="' + esc(k) + '">' +
       '<div class="lb-head"><span class="lb-name">' + esc(name) + '</span><span class="lb-meta">' + esc(meta) + '</span></div>' +
       inner + (grid ? '<span class="lb-handle" title="Drag to change the span" aria-hidden="true"></span>' : '') + '</div>';
@@ -71,6 +71,17 @@
     }).join('');
     return '<div class="lb-container' + (grid ? ' is-grid' : '') + '" data-container="' + esc(container) + '">' +
       (html || '<div class="lb-empty">Drop here</div>') + '</div>';
+  }
+
+  // A region's buttons outside its body, one strip per button position the region uses. A strip
+  // stays after its last button leaves, so the button can go back.
+  function stripsHtml(regionId, changed) {
+    var pre = 'btn:' + regionId + ':';
+    return Object.keys(state.board.order).filter(function (k) { return k.indexOf(pre) === 0; }).sort()
+      .map(function (k) {
+        return '<div class="lb-strip"><span class="lb-strip-label">Buttons · ' + esc(k.slice(pre.length)) + '</span>' +
+          containerHtml(k, changed) + '</div>';
+      }).join('');
   }
 
   function boardHtml() {
@@ -104,7 +115,15 @@
       '<button class="vd-btn vd-btn--secondary lb-open">Open page</button>' +
       '<button class="vd-btn vd-btn--ghost lb-revert"' + (dirty() && !state.busy ? '' : ' disabled') + '>Revert</button>' +
       '<button class="vd-btn vd-btn--ghost lb-undo"' + (state.board && !dirty() && !state.busy ? '' : ' disabled') + '>Undo apply</button>' +
-      '<button class="vd-btn vd-btn--primary lb-apply"' + (dirty() && !state.busy ? '' : ' disabled') + '>Apply</button>';
+      '<button class="vd-btn vd-btn--primary lb-apply"' + (dirty() && !state.busy ? '' : ' disabled') + '>Apply</button>' +
+      '<label class="lk-inline">Preview <select class="lb-pvmode">' +
+        '<option value="side">Side</option><option value="hidden">Hidden</option>' +
+        '<option value="expanded">Expanded</option><option value="popout">Pop out</option></select></label>' +
+      '<input type="range" class="lb-pvsize" min="20" max="80" step="5" value="' + pv.size + '" title="Preview width"' +
+        ' aria-label="Preview width"' + (pv.mode === 'side' ? '' : ' hidden') + '>';
+    top.querySelector('.lb-pvmode').value = pv.mode;
+    top.querySelector('.lb-pvmode').addEventListener('change', function (ev) { setPreview({ mode: ev.target.value }); });
+    top.querySelector('.lb-pvsize').addEventListener('input', function (ev) { setPreview({ size: Number(ev.target.value) }); });
     top.querySelector('.lb-open').addEventListener('click', function () {
       var app = Number(top.querySelector('.lb-app').value), page = Number(top.querySelector('.lb-page').value);
       if (!app || !(page >= 0) || top.querySelector('.lb-page').value === '') { setMessage('Enter an app and page number.'); return; }
@@ -131,13 +150,49 @@
 
   function cssEscape(s) { return String(s).replace(/["\\]/g, '\\$&'); }
 
+  // Preview pane: side by side (width from the slider), hidden, expanded over the board, or in its own window.
+  var pv = (function () {
+    try { var s = JSON.parse(window.localStorage.getItem('vd.layout.preview')); if (s && s.mode) return s; } catch (e) { /* none */ }
+    return { mode: 'side', size: 50 };
+  })();
+  var popup = null;
+
+  function previewUrl() { return VD.pagePreview.url(state.app, state.page, state.sharedSession); }
+
+  function layoutPreview() {
+    var body = host && host.querySelector('.lb-body');
+    if (!body) return;
+    body.setAttribute('data-pv', pv.mode);
+    body.style.gridTemplateColumns = pv.mode === 'side'
+      ? 'minmax(0,' + (100 - pv.size) + 'fr) minmax(0,' + pv.size + 'fr)' : '';
+  }
+
+  function setPreview(change) {
+    var was = pv.mode;
+    pv = { mode: change.mode || pv.mode, size: change.size || pv.size };
+    try { window.localStorage.setItem('vd.layout.preview', JSON.stringify(pv)); } catch (e) { /* not kept */ }
+    var slider = host.querySelector('.lb-pvsize');
+    if (slider) slider.hidden = pv.mode !== 'side';
+    layoutPreview();
+    if (pv.mode === 'popout' && was !== 'popout') loadPreview();
+    if (pv.mode !== 'popout' && was === 'popout') { if (popup && !popup.closed) popup.close(); popup = null; loadPreview(); }
+  }
+
   function loadPreview() {
     var box = host.querySelector('.lb-preview');
+    layoutPreview();
     if (state.page == null || !state.board) { box.innerHTML = ''; frame = null; return; }
+    if (pv.mode === 'popout') {
+      box.innerHTML = ''; frame = null;
+      if (!popup || popup.closed) popup = window.open(previewUrl(), 'vd-layout-preview', 'width=1100,height=800');
+      else popup.location.href = previewUrl();
+      if (!popup) setMessage('The browser blocked the preview window. Allow pop-ups for this site.', true);
+      return;
+    }
     frame = document.createElement('iframe');
     frame.className = 'lk-frame';
     frame.title = 'Page preview';
-    frame.src = VD.pagePreview.url(state.app, state.page, state.sharedSession);
+    frame.src = previewUrl();
     box.innerHTML = '';
     box.appendChild(frame);
   }
@@ -165,6 +220,8 @@
   function targetAt(containerEl, x, y) {
     var container = containerEl.getAttribute('data-container');
     var grid = containerEl.classList.contains('is-grid');
+    // Button strips lay their boxes side by side: the pointer's side of a box decides.
+    var side = container.indexOf('btn:') === 0;
     var boxes = Array.prototype.filter.call(containerEl.querySelectorAll('.lb-box'), function (b) {
       return b.parentNode.parentNode === containerEl;
     });
@@ -173,25 +230,36 @@
       if (y < r.top || y > r.bottom || (grid && (x < r.left || x > r.right))) continue;
       var key = boxes[i].getAttribute('data-key');
       if (grid) {
-        if (x < r.left + r.width / 2) return { container: container, before: splitKey(key).id, sameRow: true, el: boxes[i], edge: 'left' };
+        if (x < r.left + r.width / 2) return { container: container, beforeKey: key, sameRow: true, el: boxes[i], edge: 'left' };
         // Right half: before the next box of this row, or at the end of the row when it is the last row.
-        var next = boxes[i].nextElementSibling;
-        if (next) return { container: container, before: splitKey(next.getAttribute('data-key')).id, sameRow: true, el: boxes[i], edge: 'right' };
-        var nextRow = boxes[i].parentNode.nextElementSibling;
-        var first = nextRow && nextRow.querySelector('.lb-box');
-        return { container: container, before: first ? splitKey(first.getAttribute('data-key')).id : null, sameRow: !first, el: boxes[i], edge: 'right' };
+        // The dragged box itself is skipped: "before the dragged box" would read as no move.
+        var j = i + 1;
+        while (j < boxes.length && drag && boxes[j].getAttribute('data-key') === drag.key) j++;
+        var nb = boxes[j];
+        if (nb && nb.parentNode === boxes[i].parentNode) return { container: container, beforeKey: nb.getAttribute('data-key'), sameRow: true, el: boxes[i], edge: 'right' };
+        return { container: container, beforeKey: nb ? nb.getAttribute('data-key') : null, sameRow: true, endOfRow: !!nb, el: boxes[i], edge: 'right' };
       }
-      if (y < r.top + r.height / 2) return { container: container, before: splitKey(key).id, sameRow: false, el: boxes[i], edge: 'top' };
-      var after = boxes[i + 1];
-      return { container: container, before: after ? splitKey(after.getAttribute('data-key')).id : null, sameRow: false, el: boxes[i], edge: 'bottom' };
+      if (side && (x < r.left || x > r.right)) continue;
+      if (side ? x < r.left + r.width / 2 : y < r.top + r.height / 2) return { container: container, beforeKey: key, sameRow: false, el: boxes[i], edge: side ? 'left' : 'top' };
+      // The dragged box itself is skipped: "before the dragged box" would read as no move.
+      var a = i + 1;
+      while (a < boxes.length && drag && boxes[a].getAttribute('data-key') === drag.key) a++;
+      var after = boxes[a];
+      return { container: container, beforeKey: after ? after.getAttribute('data-key') : null, sameRow: false, el: boxes[i], edge: side ? 'right' : 'bottom' };
     }
-    return { container: container, before: null, sameRow: false, el: containerEl, edge: 'end' };
+    return { container: container, beforeKey: null, sameRow: false, el: containerEl, edge: 'end' };
   }
 
   function tryMove(key, target) {
     var k = splitKey(key);
-    if (target.before === k.id && target.container !== 'region:' + k.id) return { ok: true, same: true };
+    if (target.beforeKey === key && target.container !== 'region:' + k.id) return { ok: true, same: true };
     return M().move(clone(state.board), k.kind, k.id, target);
+  }
+
+  // The box the drop lands next to gets an outline, so the spot reads at a glance.
+  function markTarget(boardEl, el) {
+    Array.prototype.forEach.call(boardEl.querySelectorAll('.lb-droptarget'), function (x) { if (x !== el) x.classList.remove('lb-droptarget'); });
+    if (el) el.classList.add('lb-droptarget');
   }
 
   function showLine(boardEl, target, refused) {
@@ -201,8 +269,9 @@
     var vertical = target.edge === 'left' || target.edge === 'right';
     line.style.top = (target.edge === 'bottom' || target.edge === 'end' ? top + r.height - 2 : top) + 'px';
     line.style.left = (target.edge === 'right' ? left + r.width - 2 : left) + 'px';
-    line.style.width = vertical ? '3px' : r.width + 'px';
-    line.style.height = vertical ? r.height + 'px' : '3px';
+    line.style.width = vertical ? '4px' : r.width + 'px';
+    line.style.height = vertical ? r.height + 'px' : '4px';
+    markTarget(boardEl, target.el === boardEl ? null : target.el);
     line.classList.toggle('is-refused', !!refused);
     line.hidden = false;
   }
@@ -214,7 +283,7 @@
         drag = { key: box.getAttribute('data-key') };
         try { ev.dataTransfer.setData('text/plain', drag.key); ev.dataTransfer.effectAllowed = 'move'; } catch (e) { /* older browsers */ }
       });
-      box.addEventListener('dragend', function () { drag = null; el.querySelector('.vd-dropline').hidden = true; });
+      box.addEventListener('dragend', function () { drag = null; el.querySelector('.vd-dropline').hidden = true; markTarget(el, null); });
       box.addEventListener('focus', function (ev) {
         if (ev.target !== box) return;
         state.selected = box.getAttribute('data-key');
@@ -240,9 +309,10 @@
         var t = targetAt(c, ev.clientX, ev.clientY), k = splitKey(drag.key);
         drag = null;
         el.querySelector('.vd-dropline').hidden = true;
-        if (t.before === k.id) return;
+        markTarget(el, null);
+        if (t.beforeKey === k.kind + ':' + k.id) return;
         state.selected = k.kind + ':' + k.id;
-        change(M().move(state.board, k.kind, k.id, { container: t.container, before: t.before, sameRow: t.sameRow }));
+        change(M().move(state.board, k.kind, k.id, { container: t.container, beforeKey: t.beforeKey, sameRow: t.sameRow, endOfRow: t.endOfRow }));
       });
     });
   }
@@ -284,12 +354,13 @@
       change(M().setSpan(state.board, k.kind, k.id, span));
       return;
     }
-    var list = (state.board.order[container] || []).filter(function (x) { return x.indexOf(k.kind + ':') === 0; });
+    // Items and buttons step past each other; regions only past regions.
+    var list = (state.board.order[container] || []).filter(function (x) { return (x.indexOf('region:') === 0) === (k.kind === 'region'); });
     var at = list.indexOf(key), back = ev.key === 'ArrowUp' || ev.key === 'ArrowLeft';
     var sameRow = grid && (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight');
     if (back ? at <= 0 : at >= list.length - 1) return;
     var before = back ? list[at - 1] : list[at + 2];
-    change(M().move(state.board, k.kind, k.id, { container: container, before: before ? splitKey(before).id : null, sameRow: sameRow }));
+    change(M().move(state.board, k.kind, k.id, { container: container, beforeKey: before || null, sameRow: sameRow }));
   }
 
   // ------------------------------------------------------------ apply, revert, undo

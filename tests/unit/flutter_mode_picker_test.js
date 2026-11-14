@@ -4,7 +4,7 @@ const vm = require('vm');
 const assert = require('assert');
 
 const window = {};
-const ctx = { window, JSON, document: { getElementById: () => null } };
+const ctx = { window, JSON, document: { getElementById: () => null, addEventListener() {} } };
 ['plugin/files/js/look-selectors.js', 'plugin/files/js/flutter-variants.js', 'plugin/files/js/flutter-codegen.js', 'plugin/files/js/fl-params.js', 'plugin/files/js/flutter-mode.js'].forEach((f) =>
   vm.runInNewContext(fs.readFileSync(f, 'utf8'), ctx, { filename: f }));
 const M = window.VD.flutterMode;

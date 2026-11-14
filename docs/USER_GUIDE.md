@@ -6,7 +6,7 @@ The Flutter Designer styles one page of a registered application, component by c
 
 1. Enter the application and page, then click **Open page**. To design another application of the workspace, enter its id and click **Add application** first. The left list shows the page's regions, items and buttons, grouped by type. The centre shows the live page.
 2. Select a component in the list, or click it on the page. Clicking never runs it.
-3. Pick one of the six designs for its type, then adjust its settings:
+3. Pick one of the designs for its type, then adjust its settings:
    - **Basic:** colours, corner radius, padding, font size and weight.
    - **Icon** (dates and lists): icon style, size, colour, hover background and position.
    - **Show / hide:** hide parts that APEX draws, such as an Interactive Report's search bar or Actions button, a region's title bar, an item's label or a button's icon. This hides them on screen only; the APEX feature stays on.
@@ -19,14 +19,22 @@ When the application has a pushed theme, **Theme style** puts one of its named s
 
 | Type | Designs |
 | --- | --- |
-| Text, Date, List | Filled, Outlined, Soft, Underline, Glass, Pill |
-| Checkbox / Radio | Material, Chip, Card, Segmented, Pill, List tile |
+| Text, List | Filled, Outlined, Soft, Underline, Glass, Pill |
+| Date | Filled, Outlined, Soft, Underline, Glass, Pill, Dashboard |
+| Checkbox / Radio | Material, Chip, Card, Segmented, Pill, List tile, Dashboard |
 | Switch | Material, iOS, Labelled pill, Square, Thin track, Outline |
-| Button | Filled, Tonal, Outlined, Elevated, Text, Gradient |
+| Button | Filled, Tonal, Outlined, Elevated, Text, Gradient, Dashboard |
 | Display only | Plain, Chip, Tile, Badge, Outlined, Large value |
-| Region | Elevated card, Outlined card, Flat, Tonal, Glass, Accent bar |
-| Cards | Elevated, Outlined, Media, Tonal, Glass, Accent top |
+| Region | Elevated card, Outlined card, Flat, Tonal, Glass, Accent bar, Dashboard |
+| Cards | Elevated, Outlined, Media, Tonal, Glass, Accent top, Dashboard |
+| Chart | Dashboard, Minimal, Soft, Dark |
 | Classic Report, Interactive Report, Interactive Grid | Material table, Striped, Dense, Card rows, Borderless, Accent header |
+
+**Dashboard** designs match a hand-built statistics page: white cards with a light border, 16px corners, a soft shadow and the Cairo font.
+
+- **Cards:** the card Title holds the main value (large, teal), the Subtitle a second value (blue; hidden when empty), the Body a small grey label.
+- **Checkbox / Radio:** a radio group becomes a segmented toggle, a checkbox group a row of pill chips.
+- **Chart:** chart designs are templates for any native chart (bar, line, area, pie). They set the frame, title, series colours, grid lines and text colour. Colours are set again after the chart refreshes.
 
 ## Theme Designer
 

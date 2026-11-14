@@ -61,21 +61,66 @@
     });
   }
 
-  function generate(design) {
-    var css = '', ripple = [], fonts = [];
+  // Where the plug-in's ECharts file lives, from the designer page's own URL (same folder).
+  function echartsUrl(base) { return new URL('lib/echarts/echarts.min.js', base).href; }
+
+  // Tells the chart runtime where to load ECharts from. Only the plug-in's own file, never a CDN.
+  function echartsJs(url) {
+    return 'window.VD = window.VD || {}; VD.chart = VD.chart || {}; VD.chart.echartsUrl = ' + JSON.stringify(url) + ';\n';
+  }
+
+  // A chart the Chart Designer configured: has a config and a Static ID to apply it to.
+  function chartOf(c) { return c.chart && typeof c.chart === 'object' && c.staticId ? c.chart : null; }
+  function needsChartRuntime(design) { return (design.components || []).some(chartOf); }
+
+  // JSON that is safe inside a page script: no "</script>" can close it early.
+  function scriptJson(v) { return JSON.stringify(v).replace(/</g, '\\u003c'); }
+
+  var CSS_COLOR = /^(#[0-9a-f]{3,8}|rgba?\([\d.,%\s]+\)|transparent)$/i;
+  function px(v, max) { return typeof v === 'number' && isFinite(v) && v >= 0 && v <= max ? v + 'px' : null; }
+  // The region frame (Chart Designer global properties marked css): the same for both engines.
+  function chartFrameCss(sel, g) {
+    if (!g) return '';
+    var d = [];
+    if (CSS_COLOR.test(g.background || '')) d.push('background: ' + g.background);
+    if (CSS_COLOR.test(g.border || '') || px(g.borderWidth, 10)) {
+      d.push('border: ' + (px(g.borderWidth, 10) || '1px') + ' solid ' + (CSS_COLOR.test(g.border || '') ? g.border : 'currentColor'));
+    }
+    if (px(g.radius, 40)) d.push('border-radius: ' + px(g.radius, 40), 'overflow: hidden');
+    if (px(g.padding, 60)) d.push('padding: ' + px(g.padding, 60));
+    if (typeof g.fontFamily === 'string' && g.fontFamily.trim() && g.fontFamily.length <= 120) {
+      d.push('font-family: ' + g.fontFamily.replace(/[;{}<>\\]/g, ''));
+    }
+    return d.length ? sel + ' { ' + d.join('; ') + '; }\n' : '';
+  }
+
+  function generate(design, opts) {
+    opts = opts || {};
+    var css = '', ripple = [], fonts = [], charts = '', echarts = false, applies = '', frames = '';
     (design.components || []).forEach(function (c) {
+      var cfg = chartOf(c);
+      if (cfg && opts.chartRuntime) {
+        if (cfg.engine === 'echarts') echarts = true;
+        frames += important(chartFrameCss(selectorFor(c), cfg.global));
+        applies += 'VD.chart.apply(' + JSON.stringify(c.staticId) + ', ' + scriptJson(cfg) + ');\n';
+        return;
+      }
+      if (c.chart && c.chart.engine === 'echarts') echarts = true;
       if (!c.variant) return;
       var type = V.typeOf(c), variant = type && V.get(type, c.variant), sel = selectorFor(c);
       if (!variant || !sel) return;
       var vals = V.values(variant, c.values);
       css += '/* ' + type + ' ' + variant.label + ': ' + (c.name || c.staticId).replace(/\*\//g, '') + ' */\n' +
         important(variant.css(sel, vals));
-      var font = V.googleFont(vals.fontFamily);
+      var font = V.googleFont(vals.fontFamily || variant.font);
       if (font && fonts.indexOf(font) < 0) fonts.push(font);
+      if (variant.js) charts += variant.js(sel, vals, c);
       if (variant.needsJs && vals.ripple !== 'off') ripple.push(type === 'button' ? sel : sel + ' .apex-item-option label');
     });
-    if (!css) return { css: '', js: '' };
-    return { css: BASE_CSS + css, js: (ripple.length ? rippleJs(ripple) : '') + (fonts.length ? fontJs(fonts) : '') };
+    var runtime = applies ? 'if (!window.VD || !VD.chart || !VD.chart.apply) {\n' + opts.chartRuntime.replace(/\s+$/, '') + '\n}\n' : '';
+    var url = echarts && opts.echartsUrl ? echartsJs(opts.echartsUrl) : '';
+    var js = (ripple.length ? rippleJs(ripple) : '') + (fonts.length ? fontJs(fonts) : '') + runtime + url + charts + applies;
+    return { css: (css ? BASE_CSS + css : '') + frames, js: css || applies ? js : url };
   }
 
   function count(text, s) { return text.split(s).length - 1; }
@@ -100,6 +145,6 @@
     return { text: text.slice(0, a) + text.slice(b) };
   }
 
-  window.VD.flutterCodegen = { generate: generate, selectorFor: selectorFor, merge: merge, START: START, END: END,
+  window.VD.flutterCodegen = { generate: generate, echartsUrl: echartsUrl, needsChartRuntime: needsChartRuntime, selectorFor: selectorFor, merge: merge, START: START, END: END,
     important: important, rippleJs: rippleJs, fontJs: fontJs, BASE_CSS: BASE_CSS };
 })();

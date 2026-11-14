@@ -4,7 +4,7 @@ const vm = require('vm');
 const assert = require('assert');
 
 const window = {};
-const ctx = { window, JSON };
+const ctx = { window, JSON, URL };
 ['plugin/files/js/look-selectors.js', 'plugin/files/js/flutter-variants.js', 'plugin/files/js/flutter-codegen.js'].forEach((f) =>
   vm.runInNewContext(fs.readFileSync(f, 'utf8'), ctx, { filename: f }));
 const G = window.VD.flutterCodegen;
@@ -91,4 +91,56 @@ out = G.generate(design([{ key: 'region:9', kind: 'region', staticId: 'orders', 
 assert.ok(out.css.includes('body #orders .a-IRR'), 'ir css');
 assert.ok(/display:none !important/.test(out.css), 'hide switch reaches the page css');
 
+// charts have no looks: an old v1 chart entry adds no js or css of its own
+const chart = { key: 'region:5', kind: 'region', staticId: 'C1', type: 'NATIVE_JET_CHART', variant: 'v1', values: {} };
+out = G.generate(design([chart]));
+assert.ok(!out.js.includes('#0f766e') && !out.css.includes('#C1'), 'old chart look generates nothing');
+
 console.log('flutter_codegen_test: all passed');
+
+// ECharts URL: written once, only when a chart uses ECharts, only from the plug-in's own files
+{
+  const chart = (id, engine) => ({ key: 'region:' + id, kind: 'region', staticId: id, type: 'NATIVE_JET_CHART', chart: { version: 1, engine } });
+  const url = 'https://example.test/ords/r/files/plugin/lib/echarts/echarts.min.js';
+  let r = G.generate(design([chart('c1', 'jet')]), { echartsUrl: url });
+  assert.ok(!r.js.includes('echartsUrl'), 'no URL for JET charts');
+  r = G.generate(design([chart('c1', 'echarts'), chart('c2', 'echarts')]), { echartsUrl: url });
+  assert.strictEqual(r.js.split('VD.chart.echartsUrl =').length - 1, 1, 'URL written once');
+  assert.ok(r.js.includes(JSON.stringify(url)));
+  r = G.generate(design([chart('c1', 'echarts')]), {});
+  assert.ok(!r.js.includes('echartsUrl'), 'no URL when the designer does not know it');
+  assert.strictEqual(G.echartsUrl('https://h.test/ords/r/x/files/static/v5/index.html?v=3'),
+    'https://h.test/ords/r/x/files/static/v5/lib/echarts/echarts.min.js');
+}
+console.log('flutter_codegen_test echarts: OK');
+
+// Chart Designer configs: runtime once (guarded), one apply per chart, frame CSS from global css props
+{
+  const RT = '/*RUNTIME*/';
+  const chart = (id, cfg) => ({ key: 'region:' + id, kind: 'region', staticId: id, type: 'NATIVE_JET_CHART', chart: cfg });
+  let r = G.generate(design([chart('sales', { version: 1, engine: 'jet', legend: { position: 'top' } }),
+    chart('mix', { version: 1, engine: 'jet' })]), { chartRuntime: RT });
+  assert.strictEqual(r.js.split(RT).length - 1, 1, 'runtime written once');
+  assert.ok(r.js.includes('if (!window.VD || !VD.chart || !VD.chart.apply)'), 'runtime guarded');
+  assert.ok(r.js.includes('VD.chart.apply("sales", {"version":1,"engine":"jet","legend":{"position":"top"}});'), 'apply sales');
+  assert.ok(r.js.includes('VD.chart.apply("mix", '), 'apply mix');
+  assert.ok(r.js.indexOf(RT) < r.js.indexOf('VD.chart.apply('), 'runtime before apply');
+  assert.strictEqual(r.css, '', 'no CSS when no frame property is set');
+
+  r = G.generate(design([chart('sales', { version: 1, engine: 'echarts', global: { background: '#ffffff', radius: 12, palette: ['#ff0000'] } })]),
+    { chartRuntime: RT, echartsUrl: 'https://h.test/lib/echarts/echarts.min.js' });
+  assert.ok(r.css.includes('#sales {') && r.css.includes('background: #ffffff !important') && r.css.includes('border-radius: 12px !important'), 'frame css: ' + r.css);
+  assert.ok(!r.css.includes('palette'), 'palette is not CSS');
+  assert.ok(r.js.indexOf('echartsUrl') < r.js.indexOf('VD.chart.apply('), 'URL before apply');
+
+  // a script-closing string inside a text property cannot end the page script
+  r = G.generate(design([chart('sales', { version: 1, axes: { x: { title: '</script><b>' } } })]), { chartRuntime: RT });
+  assert.ok(!r.js.includes('</script>'), 'escaped');
+
+  // no runtime known: charts are not written (the designer refuses to save instead)
+  r = G.generate(design([chart('sales', { version: 1 })]), {});
+  assert.ok(!r.js.includes('VD.chart.apply('), 'no apply without runtime');
+  assert.strictEqual(G.needsChartRuntime(design([chart('sales', { version: 1 })])), true);
+  assert.strictEqual(G.needsChartRuntime(design([chart(null, { version: 1 })])), false, 'no static id');
+}
+console.log('flutter_codegen_test chart configs: OK');

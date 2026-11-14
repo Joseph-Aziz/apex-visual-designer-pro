@@ -12,22 +12,38 @@ assert.ok(F, 'VD.flutterVariants is undefined');
 
 const defaults = (v) => v.params.reduce((o, p) => (o[p.key] = p.default, o), {});
 
-// every type has six variants v1..v6
+// every type keeps v1..v6; some types add more looks; ids are unique
 assert.deepStrictEqual(Array.from(F.types),
-  ['text', 'date', 'select', 'choice', 'switch', 'button', 'display', 'region', 'classic', 'ir', 'ig', 'cards']);
-F.types.forEach((t) => {
-  assert.deepStrictEqual(F.forType(t).map((v) => v.id).join(), 'v1,v2,v3,v4,v5,v6', t + ' variant ids');
+  ['text', 'date', 'select', 'choice', 'switch', 'button', 'display', 'region', 'classic', 'ir', 'ig', 'cards', 'chart']);
+F.types.filter((t) => t !== 'chart').forEach((t) => {
+  const ids = F.forType(t).map((v) => v.id);
+  assert.strictEqual(ids.slice(0, 6).join(), 'v1,v2,v3,v4,v5,v6', t + ' variant ids');
+  assert.strictEqual(new Set(ids).size, ids.length, t + ' unique ids');
+});
+['region', 'button', 'cards', 'choice', 'date'].forEach((t) => {
+  const last = F.forType(t)[F.forType(t).length - 1];
+  assert.deepStrictEqual([last.id, last.label], ['v7', 'Dashboard'], t + ' dashboard look');
+});
+
+// looks v1..v6 render exactly as before
+const snap = JSON.parse(fs.readFileSync('tests/unit/fixtures/variants_v1_v6.json', 'utf8'));
+Object.keys(snap).forEach((k) => {
+  const [t, id] = k.split(':'), v = F.get(t, id);
+  assert.strictEqual(v.css('#X1', F.values(v, {})), snap[k], k + ' changed');
 });
 
 // labels match spec table
 const labels = (t) => F.forType(t).map((v) => v.label).join('|');
 assert.strictEqual(labels('text'), 'Filled|Outlined|Soft|Underline|Glass|Pill');
-assert.strictEqual(labels('button'), 'Filled|Tonal|Outlined|Elevated|Text|Gradient');
-assert.strictEqual(labels('region'), 'Elevated card|Outlined card|Flat|Tonal|Glass|Accent bar');
-assert.strictEqual(labels('choice'), 'Material|Chip|Card|Segmented|Pill|List tile');
+assert.strictEqual(labels('button'), 'Filled|Tonal|Outlined|Elevated|Text|Gradient|Dashboard');
+assert.strictEqual(labels('region'), 'Elevated card|Outlined card|Flat|Tonal|Glass|Accent bar|Dashboard');
+assert.strictEqual(labels('choice'), 'Material|Chip|Card|Segmented|Pill|List tile|Dashboard');
 assert.strictEqual(labels('switch'), 'Material|iOS|Labelled pill|Square|Thin track|Outline');
 ['classic', 'ir', 'ig'].forEach((r) => assert.strictEqual(labels(r), 'Material table|Striped|Dense|Card rows|Borderless|Accent header'));
-assert.strictEqual(labels('cards'), 'Elevated|Outlined|Media|Tonal|Glass|Accent top');
+assert.strictEqual(labels('cards'), 'Elevated|Outlined|Media|Tonal|Glass|Accent top|Dashboard');
+assert.strictEqual(labels('date'), 'Filled|Outlined|Soft|Underline|Glass|Pill|Dashboard');
+assert.strictEqual(labels('text'), 'Filled|Outlined|Soft|Underline|Glass|Pill');
+assert.strictEqual(F.forType('chart').length, 0, 'charts are styled by the Chart Designer, not looks');
 assert.strictEqual(labels('display'), 'Plain|Chip|Tile|Badge|Outlined|Large value');
 
 // css() output is scoped, and uses no physical left/right properties
@@ -107,6 +123,7 @@ assert.strictEqual(F.typeOf({ kind: 'item', type: 'PLUGIN_SOMETHING' }), null);
 ['classic', 'ir', 'ig'].forEach((c) => assert.strictEqual(F.typeOf({ kind: 'region', component: c }), c));
 assert.strictEqual(F.typeOf({ kind: 'region', type: 'NATIVE_CARDS' }), 'cards');
 assert.strictEqual(F.typeOf({ kind: 'region', type: 'NATIVE_STATIC' }), 'region');
+assert.strictEqual(F.typeOf({ kind: 'region', type: 'NATIVE_JET_CHART' }), 'chart');
 assert.strictEqual(F.typeOf({ kind: 'button' }), 'button');
 
 // needsJs true only for ripple variants
@@ -182,5 +199,24 @@ const btnH = F.get('button', 'v1');
 assert.ok(/body #b .t-Button-label[^{]*{ display:none/.test(btnH.css('#b', F.values(btnH, { hideLabel: 'hide' }))), 'hide button label');
 const txH = F.get('text', 'v1');
 assert.ok(/body #i .t-Form-labelContainer[^{]*{ display:none/.test(txH.css('#i', F.values(txH, { hideLabel: 'hide' }))), 'hide item label');
+
+// dashboard looks
+const dash = (t) => { const v = F.get(t, 'v7'); return v.css('#X1', F.values(v, {})); };
+const reg = dash('region');
+['1px solid #e2e8f0', 'border-radius:16px', 'rgba(15,23,42,.05)', '#0f172a', 'Cairo'].forEach((x) => assert.ok(reg.includes(x), 'region dashboard ' + x));
+const db = dash('button');
+['background:#0f766e', 'border-radius:8px', 'font-size:12px', 'font-weight:700', 'padding-block:6px', 'padding-inline:14px'].forEach((x) => assert.ok(db.includes(x), 'button dashboard ' + x));
+const dc = dash('cards');
+assert.ok(/a-CardView-title[^{]*\{[^}]*color:#0f766e[^}]*font-size:26px/.test(dc), 'cards main value teal 26px');
+assert.ok(/a-CardView-subTitle[^{]*\{[^}]*color:#2563eb/.test(dc), 'cards second value blue');
+assert.ok(/a-CardView-subTitle:empty[^{]*\{[^}]*display:none/.test(dc), 'empty second value takes no room');
+const ch = dash('choice');
+assert.ok(/\.apex-item-radio[^{]*input:checked \+ label[^{]*\{[^}]*background:#0f766e/.test(ch), 'radio segmented teal');
+assert.ok(/\.apex-item-checkbox[^{]*label[^{]*\{[^}]*border-radius:20px/.test(ch), 'checkbox pills');
+const dd = dash('date');
+assert.ok(dd.includes('#e2e8f0') && dd.includes('border-radius:'), 'date dashboard');
+['region', 'button', 'cards', 'choice', 'date'].forEach((t) => assert.strictEqual(F.get(t, 'v7').font, 'cairo', t + ' dashboard font'));
+
+assert.strictEqual(F.get('region', 'v1').js, undefined, 'other looks have no js');
 
 console.log('flutter_variants_test: all passed');

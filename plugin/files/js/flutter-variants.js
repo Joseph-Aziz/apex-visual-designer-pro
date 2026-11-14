@@ -26,6 +26,14 @@
   var COLOR = function (key, label, def) { return p(key, label, 'color', def); };
   var PX = function (key, label, def) { return p(key, label, 'px', def); };
 
+  // Dashboard style: the reference values of the hand-built statistics pages.
+  var DASH = { font: 'Cairo, system-ui, sans-serif', border: '#e2e8f0', radius: 16,
+    shadow: '0 4px 20px -2px rgba(15,23,42,.05), 0 2px 6px -1px rgba(15,23,42,.03)',
+    text: '#0f172a', muted: '#64748b', teal: '#0f766e', blue: '#2563eb', bg: '#ffffff' };
+  // Adds the Dashboard font to a look; the Advanced font setting still wins (it comes later).
+  function dashFont(css) { return function (sel, v) { return css(sel, v) + rule(sel, ', *', 'font-family:' + DASH.font + ';'); }; }
+  function dashLook(list, look) { look.id = 'v7'; look.label = 'Dashboard'; look.font = 'cairo'; look.css = dashFont(look.css); list.push(look); return list; }
+
   var fieldParams = [
     COLOR('accent', 'Focus / accent colour', '#1a73e8'),
     COLOR('bg', 'Background', '#eef1f6'),
@@ -75,6 +83,9 @@
         shapeCss = rule(sel, input, 'background:color-mix(in srgb, ' + v.bg + ' 55%, transparent); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); border:' + v.borderWidth +
             'px solid color-mix(in srgb, #fff 45%, transparent); border-radius:' + v.radius + 'px; box-shadow:0 4px 18px rgba(0,0,0,.08);') +
           rule(sel, within(input)(':focus-within'), 'border-color:' + v.accent + ';');
+      } else if (shape === 'dashboard') {
+        shapeCss = rule(sel, input, 'background:' + v.bg + '; border:' + v.borderWidth + 'px solid ' + v.border + '; border-radius:' + v.radius + 'px; box-shadow:none;') +
+          rule(sel, within(input)(':focus-within'), 'border-color:' + v.accent + '; box-shadow:0 0 0 3px color-mix(in srgb, ' + v.accent + ' 18%, transparent);');
       } else if (shape === 'pill') {
         shapeCss = rule(sel, input, 'background:transparent; border:' + v.borderWidth + 'px solid ' + v.border + '; border-radius:999px; padding-inline:' + (v.padding + 6) + 'px;') +
           rule(sel, within(input)(':focus-within'), 'border-color:' + v.accent + '; box-shadow:0 0 0 3px color-mix(in srgb, ' + v.accent + ' 22%, transparent);');
@@ -151,6 +162,10 @@
       iconInside(sel, v, '.a-Button--popupLOV', 'chevron') +
       rule(sel, '.apex-item-group:has([aria-expanded="true"]) .a-Button--popupLOV::after', 'transform:rotate(180deg);');
   }
+  var dashFieldParams = [COLOR('accent', 'Focus / accent colour', DASH.teal), COLOR('bg', 'Background', DASH.bg),
+    COLOR('text', 'Text colour', DASH.text), COLOR('border', 'Border colour', DASH.border), COLOR('icon', 'Icon colour', DASH.muted),
+    PX('radius', 'Corner radius', 10), PX('borderWidth', 'Border width', 1), PX('padding', 'Padding', 10), PX('fontSize', 'Font size', 14),
+    p('fontWeight', 'Font weight', 'weight', 600)];
   function fieldType(type, extra, icons) {
     return [['v1', 'Filled', 'filled'], ['v2', 'Outlined', 'outlined'], ['v3', 'Soft', 'soft'],
       ['v4', 'Underline', 'underline'], ['v5', 'Glass', 'glass'], ['v6', 'Pill', 'pill']].map(function (d) {
@@ -207,6 +222,23 @@
         rule(sel, f.optionLabel, 'color:' + v.text + '; font-size:' + v.fontSize + 'px;');
     } }
   ];
+  // Dashboard: a radio group is a segmented toggle, a checkbox group is a row of pill chips.
+  var dashChoiceParams = [COLOR('accent', 'Accent colour', DASH.teal), COLOR('bg', 'Option background', DASH.bg),
+    COLOR('text', 'Text colour', DASH.muted), COLOR('border', 'Border colour', DASH.border), PX('radius', 'Corner radius', 20),
+    PX('gap', 'Gap between options', 8), PX('fontSize', 'Font size', 13)];
+  dashLook(choice, { needsJs: false, params: dashChoiceParams, css: function (sel, v) {
+    var rd = '.apex-item-radio', cb = '.apex-item-checkbox';
+    return rule(sel, rd + ' .apex-item-group, ' + rd + '.apex-item-group', 'display:inline-flex; gap:0; padding:3px; background:#f1f5f9; border:1px solid ' + v.border + '; border-radius:10px;') +
+      rule(sel, cb + ' .apex-item-group, ' + cb + '.apex-item-group', 'display:flex; flex-wrap:wrap; gap:' + v.gap + 'px;') +
+      rule(sel, f.option, 'margin:0;') +
+      rule(sel, f.optionInput, 'position:absolute; opacity:0;') +
+      rule(sel, rd + ' ' + f.optionLabel, 'display:block; padding-block:6px; padding-inline:14px; border-radius:8px; color:' + v.text + '; font-size:' + v.fontSize + 'px; font-weight:700; cursor:pointer; transition:background-color .2s, color .2s;') +
+      rule(sel, rd + ' .apex-item-option input:checked + label', 'background:' + v.accent + '; color:#fff;') +
+      rule(sel, cb + ' ' + f.optionLabel, 'display:inline-block; padding-block:4px; padding-inline:14px; border:1px solid ' + v.border + '; border-radius:' + v.radius +
+        'px; background:' + v.bg + '; color:' + v.text + '; font-size:' + v.fontSize + 'px; font-weight:600; cursor:pointer; transition:background-color .2s, color .2s, border-color .2s;') +
+      rule(sel, cb + ' .apex-item-option input:checked + label', 'background:color-mix(in srgb, ' + v.accent + ' 10%, #fff); border-color:' + v.accent + '; color:' + v.accent + ';') +
+      rule(sel, '.apex-item-option input:focus-visible + label', 'box-shadow:0 0 0 2px ' + v.accent + ';');
+  } });
 
   // ---- switch ---------------------------------------------------------------
   var switchParams = [COLOR('accent', 'On colour', '#1a73e8'), COLOR('off', 'Off colour', '#e7e0ec'), COLOR('thumb', 'Thumb colour', '#ffffff'), PX('size', 'Height', 28)];
@@ -257,6 +289,12 @@
     ['v4', 'Elevated', 'elevated'], ['v5', 'Text', 'text'], ['v6', 'Gradient', 'gradient']].map(function (d) {
     return { id: d[0], label: d[1], needsJs: true, css: buttonCss(d[2]), params: buttonParams };
   });
+  var dashButtonParams = [COLOR('accent', 'Main colour', DASH.teal), COLOR('text', 'Text colour (filled)', '#ffffff'),
+    PX('radius', 'Corner radius', 8), PX('padding', 'Side padding', 14), PX('height', 'Height', 32),
+    PX('fontSize', 'Font size', 12), p('fontWeight', 'Font weight', 'weight', 700)];
+  dashLook(button, { needsJs: true, params: dashButtonParams, css: function (sel, v) {
+    return buttonCss('filled')(sel, v) + rule(sel, '', 'padding-block:6px; block-size:auto; min-block-size:' + v.height + 'px;');
+  } });
 
   // ---- display only ----------------------------------------------------------
   var displayParams = [COLOR('accent', 'Accent colour', '#1a73e8'), COLOR('bg', 'Background', '#eef1f6'), COLOR('text', 'Text colour', '#1c1b1f'), PX('radius', 'Corner radius', 12), PX('fontSize', 'Font size', 16)];
@@ -291,6 +329,15 @@
     ['v4', 'Tonal', 'tonal'], ['v5', 'Glass', 'glass'], ['v6', 'Accent bar', 'accent']].map(function (d) {
     return { id: d[0], label: d[1], needsJs: false, css: regionCss(d[2]), params: regionParams };
   });
+  var dashRegionParams = [COLOR('accent', 'Accent colour', DASH.teal), COLOR('bg', 'Background', DASH.bg), COLOR('title', 'Title colour', DASH.text),
+    COLOR('border', 'Border colour', DASH.border), PX('radius', 'Corner radius', DASH.radius), PX('padding', 'Padding', 20), PX('titleSize', 'Title size', 16)];
+  function dashRegionCss(sel, v) {
+    return rule(sel, '', 'background:' + v.bg + '; border:1px solid ' + v.border + '; box-shadow:' + DASH.shadow + '; border-radius:' + v.radius + 'px; overflow:hidden;') +
+      rule(sel, R.header, 'background:transparent; border:0; padding-inline:' + v.padding + 'px; padding-block-start:' + v.padding + 'px;') +
+      rule(sel, R.title, 'color:' + v.title + '; font-size:' + v.titleSize + 'px; font-weight:700;') +
+      rule(sel, R.body, 'padding:' + v.padding + 'px;');
+  }
+  dashLook(region, { needsJs: false, params: dashRegionParams, css: dashRegionCss });
 
   // ---- report (classic, IR, IG) ----------------------------------------------
   var reportParams = [COLOR('header', 'Header text', '#49454f'), COLOR('headerBg', 'Header background', '#ffffff'), COLOR('hover', 'Hover tint', '#f3edf7'),
@@ -347,14 +394,30 @@
     ['v4', 'Tonal', 'tonal'], ['v5', 'Glass', 'glass'], ['v6', 'Accent top', 'accent']].map(function (d) {
     return { id: d[0], label: d[1], needsJs: false, css: cardsCss(d[2]), params: cardsParams };
   });
+  // Dashboard KPI cards: Title = main value (teal), Subtitle = second value (blue),
+  // Body = small muted sub-label. An empty Subtitle takes no room.
+  var dashCardsParams = [COLOR('bg', 'Card background', DASH.bg), COLOR('title', 'Main value colour', DASH.teal), COLOR('second', 'Second value colour', DASH.blue),
+    COLOR('muted', 'Label colour', DASH.muted), COLOR('border', 'Border colour', DASH.border), PX('radius', 'Corner radius', DASH.radius),
+    PX('padding', 'Padding', 18), PX('valueSize', 'Value size', 26)];
+  dashLook(cards, { needsJs: false, params: dashCardsParams, css: function (sel, v) {
+    return rule(sel, C.card, 'border:1px solid ' + v.border + '; box-shadow:' + DASH.shadow + '; background:' + v.bg + '; border-radius:' + v.radius + 'px; overflow:hidden; transition:box-shadow .2s, transform .2s;') +
+      rule(sel, C.card + ':hover', 'transform:translateY(-2px);') +
+      rule(sel, C.title, 'color:' + v.title + '; font-size:' + v.valueSize + 'px; font-weight:700; line-height:1.2;') +
+      rule(sel, '.a-CardView-subTitle', 'color:' + v.second + '; font-size:' + v.valueSize + 'px; font-weight:700; line-height:1.2;') +
+      rule(sel, '.a-CardView-subTitle:empty', 'display:none;') +
+      rule(sel, C.body, 'padding:' + v.padding + 'px; color:' + v.muted + '; font-size:11px; font-weight:600;');
+  } });
+
+  // Charts have no looks here: the Chart Designer (chart-designer.js) styles them.
 
   function tag(type, list, params) {
-    return list.map(function (v) { v.type = type; if (params) v.params = params; return v; });
+    return list.map(function (v) { v.type = type; if (params && !v.params) v.params = params; return v; });
   }
 
   var LIBRARY = {
     text: fieldType('text'),
-    date: fieldType('date', datePopup, iconParams(['calendar', 'event', 'clock'])),
+    date: dashLook(fieldType('date', datePopup, iconParams(['calendar', 'event', 'clock'])),
+      { type: 'date', needsJs: false, css: fieldCss('dashboard', datePopup), params: dashFieldParams.concat(iconParams(['calendar', 'event', 'clock'])) }),
     select: fieldType('select', chevron, iconParams(['chevron', 'caret', 'arrow'])),
     choice: tag('choice', choice, choiceParams),
     'switch': tag('switch', sw),
@@ -364,7 +427,8 @@
     classic: tag('classic', report('classic')),
     ir: tag('ir', report('ir')),
     ig: tag('ig', report('ig')),
-    cards: tag('cards', cards)
+    cards: tag('cards', cards),
+    chart: []
   };
 
   // ---- advanced settings: shared by every variant; empty means "as the variant has it"
@@ -397,7 +461,7 @@
   var SHADOWS = { none: 'none', sm: '0 1px 2px rgba(0,0,0,.2)', md: '0 3px 8px rgba(0,0,0,.18)', lg: '0 8px 24px rgba(0,0,0,.2)' };
   // The element that carries the look of each type ('' = the selected element itself).
   var SURFACE = { text: S.field.input, date: S.field.input, select: S.field.input, choice: S.field.optionLabel,
-    'switch': S.field.switchTrack, button: '', display: S.field.display, region: '', classic: '', ir: '', ig: '', cards: S.cards.card };
+    'switch': S.field.switchTrack, button: '', display: S.field.display, region: '', classic: '', ir: '', ig: '', cards: S.cards.card, chart: '' };
   function pseudo(sub, ps) { return sub ? sub.split(',').map(function (s) { return s.trim() + ps; }).join(', ') : ps; }
   function isSet(v) { return v !== '' && v != null; }
   function advancedCss(type) {
@@ -440,7 +504,7 @@
     hideIcon: 'Icon' };
   function merge() { var o = {}; Array.prototype.forEach.call(arguments, function (m) { Object.keys(m).forEach(function (k) { o[k] = m[k]; }); }); return o; }
   var HIDES = { ir: merge(H.ir, H.region), ig: merge(H.ig, H.region), classic: merge(H.classic, H.region), cards: merge(H.cards, H.region),
-    region: H.region, text: H.item, date: H.item, select: H.item, choice: H.item, 'switch': H.item, display: H.item, button: H.button };
+    region: H.region, chart: H.region, text: H.item, date: H.item, select: H.item, choice: H.item, 'switch': H.item, display: H.item, button: H.button };
   // The column menu stays visible as plain text: only its click is switched off.
   var HIDE_DECL = { hideColumnMenu: 'pointer-events:none; cursor:default;' };
   function hideParams(type) {
@@ -463,8 +527,11 @@
     var extra = advancedCss(type), hide = hideCss(type), hp = hideParams(type);
     LIBRARY[type] = LIBRARY[type].map(function (v) {
       var base = v.css;
-      return { type: v.type, id: v.id, label: v.label, needsJs: v.needsJs, params: v.params.concat(hp, advancedParams),
+      var out = { type: v.type, id: v.id, label: v.label, needsJs: v.needsJs, params: v.params.concat(hp, advancedParams),
         css: function (sel, vals) { return base(sel, vals) + hide(sel, vals) + extra(sel, vals); } };
+      if (v.font) out.font = v.font;
+      if (v.js) out.js = v.js;
+      return out;
     });
   });
 
@@ -492,7 +559,7 @@
       if (c.kind === 'button') return 'button';
       if (c.kind === 'region') {
         if (c.component === 'classic' || c.component === 'ir' || c.component === 'ig') return c.component;
-        return c.type === 'NATIVE_CARDS' ? 'cards' : 'region';
+        return c.type === 'NATIVE_CARDS' ? 'cards' : c.type === 'NATIVE_JET_CHART' ? 'chart' : 'region';
       }
       return ITEM_TYPES[c.type] || null;
     },
