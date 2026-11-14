@@ -95,6 +95,8 @@ whenever sqlerror exit sql.sqlcode rollback
 -- The plug-in installs its database objects into the parsing schema on first use.
 --------------------------------------------------------------------------------
 begin
+-- Export format of APEX 24.2, not the instance version: every later release, 26.1 and
+-- 26.2 included, imports it.
 wwv_flow_imp.import_begin (
  p_version_yyyy_mm_dd=>'2024.11.30'
 ,p_release=>'24.2.0'
