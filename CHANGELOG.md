@@ -7,7 +7,9 @@
 - **Chart Designer:** a native chart region opens a designer of its own. Pick the engine, Oracle JET or Apache ECharts (shipped with the plug-in, no CDN), then style each part: chart, series, points, axes, labels, legend, tooltip and reference lines, with Basic and Advanced settings, undo and redo, and templates such as Monthly sales and Statistics. ECharts adds gauge, waterfall and heatmap. Older chart looks are converted to Chart Designer settings when the page is opened.
 - **Dashboard looks:** a seventh look, **Dashboard**, for Region, Cards, Button, Radio group, Checkbox group and Date field, matching a hand-built statistics page (white cards, 16px corners, soft shadow, Cairo font).
 - **Theme style on a component:** Design items can put one of the pushed theme's named styles on the selected component.
-- **Page 0:** Design items accepts page 0, as the page bar and Layout already did.
+- **Page 0:** Design items accepts page 0, as the page bar and Layout already did. APEX does not run page 0 on its own, so its preview shows a message instead; its components are picked from the list.
+- **Fix:** the designer's file URLs carry the release version again (they were stuck at 1.1.0), so browsers load the new files after an upgrade.
+- **Fix:** saving a chart design no longer fails with ORA-06502. The page loads the chart runtime from the plug-in files instead of carrying it in its own JavaScript, which the page import limits to 32,767 characters.
 - **Fix:** when a page write fails after the import step, the page is put back as it was. A page is never lost.
 - **Fix:** the CSS class list is quoted when written into the page.
 
