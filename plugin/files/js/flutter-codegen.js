@@ -99,7 +99,7 @@
     var css = '', ripple = [], fonts = [], charts = '', echarts = false, applies = '', frames = '';
     (design.components || []).forEach(function (c) {
       var cfg = chartOf(c);
-      if (cfg && opts.chartRuntime) {
+      if (cfg && opts.chartRuntimeUrls && opts.chartRuntimeUrls.length) {
         if (cfg.engine === 'echarts') echarts = true;
         frames += important(chartFrameCss(selectorFor(c), cfg.global));
         applies += 'VD.chart.apply(' + JSON.stringify(c.staticId) + ', ' + scriptJson(cfg) + ');\n';
@@ -117,9 +117,26 @@
       if (variant.js) charts += variant.js(sel, vals, c);
       if (variant.needsJs && vals.ripple !== 'off') ripple.push(type === 'button' ? sel : sel + ' .apex-item-option label');
     });
-    var runtime = applies ? 'if (!window.VD || !VD.chart || !VD.chart.apply) {\n' + opts.chartRuntime.replace(/\s+$/, '') + '\n}\n' : '';
+    // The chart runtime is loaded from the plug-in files, never pasted into the page: the page
+    // import takes at most 32,767 characters of page JavaScript.
+    var runtime = applies ? [
+      '(function () {',
+      '  function run() {',
+      applies.replace(/\n$/, '').replace(/^/gm, '    '),
+      '  }',
+      '  if (window.VD && VD.chart && VD.chart.apply) { run(); return; }',
+      '  var urls = ' + scriptJson(opts.chartRuntimeUrls) + ', i = 0;',
+      '  (function next() {',
+      '    if (i >= urls.length) { run(); return; }',
+      "    var s = document.createElement('script');",
+      '    s.src = urls[i++];',
+      '    s.onload = next;',
+      "    s.onerror = function () { console.error('Chart Designer: cannot load ' + s.src); };",
+      '    document.head.appendChild(s);',
+      '  })();',
+      '})();', ''].join('\n') : '';
     var url = echarts && opts.echartsUrl ? echartsJs(opts.echartsUrl) : '';
-    var js = (ripple.length ? rippleJs(ripple) : '') + (fonts.length ? fontJs(fonts) : '') + runtime + url + charts + applies;
+    var js = (ripple.length ? rippleJs(ripple) : '') + (fonts.length ? fontJs(fonts) : '') + url + charts + runtime;
     return { css: (css ? BASE_CSS + css : '') + frames, js: css || applies ? js : url };
   }
 

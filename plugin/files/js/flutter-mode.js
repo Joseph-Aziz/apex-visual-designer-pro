@@ -27,7 +27,7 @@
     lastField: null,     // the field typed in last, so a run of keystrokes is one undo step
     chartKey: null,      // the chart whose Chart Designer panel is open
     chartView: { node: 'chart', tab: 'all', level: 'basic', width: 'desktop', point: '' },
-    chartRuntime: null   // text of the chart runtime written into the page, loaded on demand
+    chartRuntime: null   // text of the chart runtime for the live preview, loaded on demand
   };
   var CHART_FILES = ['chart-schema', 'chart-jet', 'chart-echarts', 'chart-runtime'];
   var CD = function () { return VD.chartDesigner; };
@@ -61,7 +61,11 @@
   function hasPage() { return state.page != null; }
   function dirty() { return hasPage() && JSON.stringify(state.design) !== state.savedJson; }
   function output() { return G().generate({ app: state.app, page: state.page, components: state.design.components },
-    { echartsUrl: G().echartsUrl(document.baseURI), chartRuntime: state.chartRuntime }); }
+    { echartsUrl: G().echartsUrl(document.baseURI), chartRuntimeUrls: chartRuntimeUrls() }); }
+  // The saved page loads the chart runtime from these plug-in file URLs.
+  function chartRuntimeUrls() {
+    return CHART_FILES.map(function (n) { return new URL(window.vdAsset('js/' + n + '.js'), document.baseURI).href; });
+  }
 
   // The chart runtime is the plug-in's own four files, read once from the designer's folder.
   var runtimeLoading = null;
@@ -260,6 +264,7 @@
   function loadPreview() {
     var box = host.querySelector('.fl-preview');
     if (!hasPage()) { box.innerHTML = '<div class="lk-empty">Attach a page to see it here.</div>'; frame = null; return; }
+    if (!VD.pagePreview.runnable(state.page)) { box.innerHTML = '<div class="lk-empty">' + VD.pagePreview.noPreview + '</div>'; frame = null; return; }
     frame = document.createElement('iframe');
     frame.className = 'lk-frame';
     frame.title = 'Page preview';
@@ -500,12 +505,6 @@
   // ------------------------------------------------------------ save and history
   // then: runs after a successful save (leaving the view).
   function save(then) {
-    // Without the runtime text a chart design would be saved with no code to draw it.
-    if (G().needsChartRuntime(state.design) && !state.chartRuntime) {
-      setMessage('The chart runtime is not loaded yet, so chart designs cannot be saved. Wait a moment and try again.');
-      loadChartRuntime().catch(function (e) { setMessage(e.message); });
-      return;
-    }
     var out = output();
     var cssCheck = G().merge(state.pageCss, out.css), jsCheck = G().merge(state.pageJs, out.js);
     if (cssCheck.error || jsCheck.error) { setMessage(cssCheck.error || jsCheck.error); return; }

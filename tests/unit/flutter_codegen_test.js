@@ -114,33 +114,61 @@ console.log('flutter_codegen_test: all passed');
 }
 console.log('flutter_codegen_test echarts: OK');
 
-// Chart Designer configs: runtime once (guarded), one apply per chart, frame CSS from global css props
+// Chart Designer configs: runtime loaded once from the plug-in files (never pasted into the page),
+// one apply per chart, frame CSS from global css props
 {
-  const RT = '/*RUNTIME*/';
+  const RT = ['https://h.test/f/js/chart-schema.js?v=1', 'https://h.test/f/js/chart-runtime.js?v=1'];
   const chart = (id, cfg) => ({ key: 'region:' + id, kind: 'region', staticId: id, type: 'NATIVE_JET_CHART', chart: cfg });
   let r = G.generate(design([chart('sales', { version: 1, engine: 'jet', legend: { position: 'top' } }),
-    chart('mix', { version: 1, engine: 'jet' })]), { chartRuntime: RT });
-  assert.strictEqual(r.js.split(RT).length - 1, 1, 'runtime written once');
-  assert.ok(r.js.includes('if (!window.VD || !VD.chart || !VD.chart.apply)'), 'runtime guarded');
+    chart('mix', { version: 1, engine: 'jet' })]), { chartRuntimeUrls: RT });
+  assert.strictEqual(r.js.split(JSON.stringify(RT)).length - 1, 1, 'runtime URLs written once');
+  assert.ok(r.js.length < 3000, 'page code stays small, the runtime is loaded by URL: ' + r.js.length);
   assert.ok(r.js.includes('VD.chart.apply("sales", {"version":1,"engine":"jet","legend":{"position":"top"}});'), 'apply sales');
   assert.ok(r.js.includes('VD.chart.apply("mix", '), 'apply mix');
-  assert.ok(r.js.indexOf(RT) < r.js.indexOf('VD.chart.apply('), 'runtime before apply');
-  assert.strictEqual(r.css, '', 'no CSS when no frame property is set');
+  new Function(r.js);
+
+  // the loader: scripts in order, then the applies; an already loaded runtime is not loaded again
+  const run = (preloaded) => {
+    const added = [], calls = [];
+    const doc = { head: { appendChild: (s) => { added.push(s.src); setImmediate(s.onload); } },
+      createElement: () => ({}) };
+    const win = { VD: preloaded ? { chart: { apply: (id) => calls.push(id) } } : undefined };
+    win.window = win;
+    new Function('window', 'document', 'VD', 'console', r.js)(win, doc, win.VD, console);
+    return { added, calls, win };
+  };
+  let x = run(true);
+  assert.deepStrictEqual(x.added, [], 'runtime already there: nothing loaded');
+  assert.deepStrictEqual(x.calls, ['sales', 'mix']);
 
   r = G.generate(design([chart('sales', { version: 1, engine: 'echarts', global: { background: '#ffffff', radius: 12, palette: ['#ff0000'] } })]),
-    { chartRuntime: RT, echartsUrl: 'https://h.test/lib/echarts/echarts.min.js' });
+    { chartRuntimeUrls: RT, echartsUrl: 'https://h.test/lib/echarts/echarts.min.js' });
   assert.ok(r.css.includes('#sales {') && r.css.includes('background: #ffffff !important') && r.css.includes('border-radius: 12px !important'), 'frame css: ' + r.css);
   assert.ok(!r.css.includes('palette'), 'palette is not CSS');
   assert.ok(r.js.indexOf('echartsUrl') < r.js.indexOf('VD.chart.apply('), 'URL before apply');
 
   // a script-closing string inside a text property cannot end the page script
-  r = G.generate(design([chart('sales', { version: 1, axes: { x: { title: '</script><b>' } } })]), { chartRuntime: RT });
+  r = G.generate(design([chart('sales', { version: 1, axes: { x: { title: '</script><b>' } } })]), { chartRuntimeUrls: RT });
   assert.ok(!r.js.includes('</script>'), 'escaped');
 
-  // no runtime known: charts are not written (the designer refuses to save instead)
+  // no runtime known: charts are not written
   r = G.generate(design([chart('sales', { version: 1 })]), {});
   assert.ok(!r.js.includes('VD.chart.apply('), 'no apply without runtime');
   assert.strictEqual(G.needsChartRuntime(design([chart('sales', { version: 1 })])), true);
   assert.strictEqual(G.needsChartRuntime(design([chart(null, { version: 1 })])), false, 'no static id');
+
+  // not loaded yet: loads each file in order, then applies
+  r = G.generate(design([chart('sales', { version: 1 })]), { chartRuntimeUrls: RT });
+  const added = [], calls = [];
+  const win = {}; win.window = win;
+  const doc = { createElement: () => ({}), head: { appendChild: (s) => {
+    added.push(s.src);
+    if (/chart-runtime/.test(s.src)) win.VD.chart.apply = (id) => calls.push(id);
+    s.onload();
+  } } };
+  win.VD = { chart: {} };
+  new Function('window', 'document', 'VD', 'console', r.js)(win, doc, win.VD, console);
+  assert.deepStrictEqual(added, RT, 'files loaded in order');
+  assert.deepStrictEqual(calls, ['sales'], 'applied after loading');
 }
 console.log('flutter_codegen_test chart configs: OK');
