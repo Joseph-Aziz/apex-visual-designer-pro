@@ -21,6 +21,12 @@
     return base + '/f?p=' + appId + ':' + pageId + (session ? ':' + session : '');
   }
 
+  // APEX refuses to run page 0 by URL; its components show on every other page instead.
+  function runnable(pageId) { return pageId != null && String(pageId) !== '0'; }
+
+  // Message for a page that has no preview.
+  var NO_PREVIEW = 'Page 0 cannot run by itself, so there is no preview. Its components show on every page; pick them in the list.';
+
   function doc(frame) {
     try { return frame && frame.contentDocument; } catch (e) { return null; }
   }
@@ -35,5 +41,5 @@
     return true;
   }
 
-  window.VD.pagePreview = { url: url, doc: doc, setStyle: setStyle };
+  window.VD.pagePreview = { url: url, runnable: runnable, noPreview: NO_PREVIEW, doc: doc, setStyle: setStyle };
 })();

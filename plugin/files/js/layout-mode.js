@@ -173,6 +173,7 @@
     var box = host.querySelector('.lb-preview');
     layoutPreview();
     if (state.page == null || !state.board) { box.innerHTML = ''; frame = null; return; }
+    if (!VD.pagePreview.runnable(state.page)) { box.innerHTML = '<div class="lk-empty">' + VD.pagePreview.noPreview + '</div>'; frame = null; return; }
     if (pv.mode === 'popout') {
       box.innerHTML = ''; frame = null;
       if (!popup || popup.closed) popup = window.open(previewUrl(), 'vd-layout-preview', 'width=1100,height=800');
