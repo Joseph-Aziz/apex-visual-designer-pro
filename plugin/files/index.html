@@ -38,7 +38,7 @@
       <div class="rail-label">Design</div>
       <button class="rail-item is-active" data-view="flutter">
         <span class="rail-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3L5 12l3 3L20 3z"/><path d="M14 13l-6 6 3 3 6-6z"/></svg></span>
-        <span>Flutter Designer</span>
+        <span>Design items</span>
       </button>
       <button class="rail-item" data-view="theme">
         <span class="rail-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 100 18c1.1 0 1.6-.9 1.2-1.8-.5-1.1.2-2.2 1.4-2.2H17a4 4 0 004-4c0-5-4-10-9-10z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10.5" cy="7" r="1.2" fill="currentColor"/><circle cx="15" cy="7.5" r="1.2" fill="currentColor"/></svg></span>
@@ -46,12 +46,13 @@
       </button>
       <button class="rail-item" data-view="layout">
         <span class="rail-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M12 9v12"/></svg></span>
-        <span>Layout Board</span>
+        <span>Layout</span>
       </button>
     </div>
   </nav>
 
   <main class="views">
+    <div class="lk-top page-bar" id="page-bar" aria-label="Open page"></div>
     <section class="view is-active" id="view-flutter"><div class="look-host" id="flutter-host"></div></section>
     <section class="view" id="view-theme"><div class="look-host" id="theme-host"></div></section>
     <section class="view" id="view-layout"><div class="look-host" id="layout-host"></div></section>
@@ -60,7 +61,7 @@
 
 <script>
   // Loaded in this order with document.write so each runs before the next, as plain tags would.
-  ['look-selectors', 'page-preview', 'flutter-variants', 'flutter-codegen', 'repository', 'layout-model', 'layout-mode', 'fl-params', 'chart-schema', 'chart-designer', 'chart-migrate', 'undo-stack', 'flutter-mode', 'theme-codegen', 'theme-mode', 'app'].forEach(function (name) {
+  ['look-selectors', 'page-preview', 'flutter-variants', 'flutter-codegen', 'repository', 'layout-model', 'layout-mode', 'fl-params', 'chart-schema', 'chart-designer', 'chart-migrate', 'undo-stack', 'flutter-mode', 'theme-codegen', 'theme-mode', 'page-bar', 'app'].forEach(function (name) {
     document.write('<script src="' + vdAsset('js/' + name + '.js') + '"><\/script>');
   });
 </script>

@@ -17,6 +17,8 @@ DECLARE
   l_n    NUMBER;
   l_bad  PLS_INTEGER := 0;
   l_grid BOOLEAN := FALSE;
+  l_id     VARCHAR2(40);
+  l_region VARCHAR2(40);
 
   PROCEDURE ok(p_name VARCHAR2, p_cond BOOLEAN) IS
   BEGIN
@@ -37,10 +39,13 @@ BEGIN
   l_arr := l_obj.get_array('items');
   FOR i IN 0 .. l_arr.get_size - 1 LOOP
     l_el := TREAT(l_arr.get(i) AS JSON_OBJECT_T);
+    -- JSON object methods cannot be called inside SQL, so read the values first.
+    l_id := l_el.get_string('id');
+    l_region := l_el.get_string('region');
     SELECT COUNT(*) INTO l_n FROM apex_application_page_items
      WHERE application_id = &&TEST_APP AND page_id = &&SCRATCH_PAGE
-       AND item_id = TO_NUMBER(l_el.get_string('id'))
-       AND NVL(TO_CHAR(region_id), '-') = NVL(l_el.get_string('region'), '-');
+       AND item_id = TO_NUMBER(l_id)
+       AND NVL(TO_CHAR(region_id), '-') = NVL(l_region, '-');
     IF l_n = 0 THEN l_bad := l_bad + 1; END IF;
   END LOOP;
   ok('each item sits in its dictionary region', l_bad = 0 AND l_arr.get_size > 0);
@@ -90,7 +95,7 @@ DECLARE
 BEGIN
   SELECT TO_CHAR(region_id), display_sequence INTO l_r1, l_seq FROM apex_application_page_regions
    WHERE application_id = &&TEST_APP AND page_id = &&SCRATCH_PAGE AND parent_region_id IS NULL
-     AND display_position = 'BODY'
+     AND display_position_code = 'BODY'
    ORDER BY display_sequence FETCH FIRST 1 ROW ONLY;
   l_token := &&VD_SCHEMA..PKG_VD_PAGE_CODE.layout_token(&&TEST_APP, &&SCRATCH_PAGE);
 

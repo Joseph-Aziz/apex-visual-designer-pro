@@ -110,9 +110,6 @@
       '<strong>Layout board</strong>' +
       '<span class="lk-state">' + (state.board ? (dirty() ? 'Changes not applied' : 'Applied') : '') + '</span>' +
       '<span class="lk-spacer"></span>' +
-      '<label class="lk-inline">App <input type="number" class="lb-app" value="' + esc(state.app) + '"></label>' +
-      '<label class="lk-inline">Page <input type="number" class="lb-page" value="' + esc(state.page == null ? '' : state.page) + '"></label>' +
-      '<button class="vd-btn vd-btn--secondary lb-open">Open page</button>' +
       '<button class="vd-btn vd-btn--ghost lb-revert"' + (dirty() && !state.busy ? '' : ' disabled') + '>Revert</button>' +
       '<button class="vd-btn vd-btn--ghost lb-undo"' + (state.board && !dirty() && !state.busy ? '' : ' disabled') + '>Undo apply</button>' +
       '<button class="vd-btn vd-btn--primary lb-apply"' + (dirty() && !state.busy ? '' : ' disabled') + '>Apply</button>' +
@@ -124,12 +121,6 @@
     top.querySelector('.lb-pvmode').value = pv.mode;
     top.querySelector('.lb-pvmode').addEventListener('change', function (ev) { setPreview({ mode: ev.target.value }); });
     top.querySelector('.lb-pvsize').addEventListener('input', function (ev) { setPreview({ size: Number(ev.target.value) }); });
-    top.querySelector('.lb-open').addEventListener('click', function () {
-      var app = Number(top.querySelector('.lb-app').value), page = Number(top.querySelector('.lb-page').value);
-      if (!app || !(page >= 0) || top.querySelector('.lb-page').value === '') { setMessage('Enter an app and page number.'); return; }
-      if (dirty() && !window.confirm('Discard the layout changes that are not applied?')) return;
-      attach(app, page);
-    });
     top.querySelector('.lb-revert').addEventListener('click', revert);
     top.querySelector('.lb-undo').addEventListener('click', undo);
     top.querySelector('.lb-apply').addEventListener('click', function () { apply(); });
@@ -409,9 +400,16 @@
   window.VD.layoutMode = {
     enter: function () {
       host = document.getElementById('layout-host');
-      if (state.app == null && VD.config && VD.config.app) state.app = VD.config.app;
       if (!host) return;
+      var p = VD.pageBar && VD.pageBar.current();
+      if (p && (p.app !== state.app || p.page !== state.page)) { attach(p.app, p.page); return; }
       render(!frame);
+    },
+    // From the page bar; false keeps the open page (the user kept the changes that are not applied).
+    open: function (app, page) {
+      if (dirty() && !window.confirm('Discard the layout changes that are not applied?')) return false;
+      attach(app, page);
+      return true;
     },
     // false keeps the board open: the user cancelled, or chose Apply (then onLeave runs after it).
     leave: function (onLeave) {

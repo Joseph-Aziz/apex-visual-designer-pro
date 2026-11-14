@@ -148,7 +148,10 @@ code{font-family:var(--mono)}
 .rail-foot p{font-size:10px;line-height:1.45;color:var(--muted);margin-top:4px}
 
 /* ================================= views ================================ */
-.views{flex:1;min-width:0;position:relative;background:var(--bg)}
+.views{flex:1;min-width:0;position:relative;background:var(--bg);display:flex;flex-direction:column}
+.views>.view{flex:1;min-height:0;height:auto}
+.page-bar[hidden]{display:none}
+.page-bar .pb-msg{padding:0;background:none;border:0}
 .view{display:none;height:100%;overflow:auto}
 .view.is-active{display:block}
 .view#view-designer{overflow:hidden}

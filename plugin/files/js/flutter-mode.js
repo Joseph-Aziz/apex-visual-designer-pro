@@ -286,33 +286,20 @@
   function renderTop() {
     var top = host.querySelector('.fl-top');
     top.innerHTML =
-      '<strong class="fl-title">Flutter Designer</strong>' +
+      '<strong class="fl-title">Design items</strong>' +
       '<span class="lk-state">' + (state.page ? (dirty() ? 'Unsaved changes' : 'Saved') : '') + '</span>' +
       '<span class="lk-spacer"></span>' +
       '<button class="vd-btn vd-btn--ghost fl-undo" title="Undo (Ctrl+Z)"' + (state.undo && state.undo.canUndo() ? '' : ' disabled') + '>Undo</button>' +
       '<button class="vd-btn vd-btn--ghost fl-redo" title="Redo (Ctrl+Y)"' + (state.undo && state.undo.canRedo() ? '' : ' disabled') + '>Redo</button>' +
       '<button class="vd-btn vd-btn--ghost fl-use-page" aria-pressed="' + state.usePage + '" title="Use the page in the preview: fill items and submit, for example to show a chart that needs dates. Turn off to select components again.">' +
         (state.usePage ? 'Using page: on' : 'Use page') + '</button>' +
-      '<label class="lk-inline">App <input type="number" class="fl-app" value="' + esc(state.app) + '"></label>' +
-      '<label class="lk-inline">Page <input type="number" class="fl-page" value="' + esc(state.page || '') + '"></label>' +
-      '<button class="vd-btn vd-btn--ghost fl-add-app" title="Let the designer work on this application">Add application</button>' +
-      '<button class="vd-btn vd-btn--secondary fl-attach">Open page</button>' +
       '<button class="vd-btn vd-btn--ghost fl-history"' + (state.page ? '' : ' disabled') + '>History</button>' +
       '<button class="vd-btn vd-btn--primary fl-save"' + (state.page && dirty() && !state.busy ? '' : ' disabled') + '>Save to page</button>';
-    top.querySelector('.fl-attach').addEventListener('click', function () {
-      var app = Number(top.querySelector('.fl-app').value), page = Number(top.querySelector('.fl-page').value);
-      if (!app || !(page >= 0)) { setMessage('Enter an app and page number.'); return; }
-      if (dirty() && !window.confirm('Discard unsaved changes on this page?')) return;
-      attach(app, page);
-    });
-    top.querySelector('.fl-add-app').addEventListener('click', function () {
-      addApp(Number(top.querySelector('.fl-app').value));
-    });
     top.querySelector('.fl-history').addEventListener('click', openHistory);
     top.querySelector('.fl-undo').addEventListener('click', function () { step(false); });
     top.querySelector('.fl-redo').addEventListener('click', function () { step(true); });
     top.querySelector('.fl-use-page').addEventListener('click', function () { state.usePage = !state.usePage; render(); });
-    top.querySelector('.fl-save').addEventListener('click', save);
+    top.querySelector('.fl-save').addEventListener('click', function () { save(); });
   }
 
   function renderLeft() {
@@ -332,7 +319,7 @@
           (blocked ? ' disabled title="' + esc(blocked) + '"' : '') + '><b>' + esc(c.label) + '</b><span>' +
           esc(blocked || (c.needsStaticId ? 'set Static ID first' : ch && ch.chart ? 'Chart Designer' : ch ? V().get(c.ftype, ch.variant).label : 'plain')) + '</span></button>';
       }).join('');
-    }).join('') : '<p class="lk-hint">Enter an app and page, then Open page.</p>';
+    }).join('') : '<p class="lk-hint">Open a page in the page bar above.</p>';
     var left = host.querySelector('.fl-left');
     left.innerHTML = html;
     left.querySelectorAll('[data-key]').forEach(function (b) {
@@ -510,7 +497,8 @@
   }
 
   // ------------------------------------------------------------ save and history
-  function save() {
+  // then: runs after a successful save (leaving the view).
+  function save(then) {
     // Without the runtime text a chart design would be saved with no code to draw it.
     if (G().needsChartRuntime(state.design) && !state.chartRuntime) {
       setMessage('The chart runtime is not loaded yet, so chart designs cannot be saved. Wait a moment and try again.');
@@ -525,22 +513,12 @@
     VD.repository.saveFlutter(state.app, state.page, state.token, VD.chartMigrate.strip(state.design), out.css, out.js)
       .then(function () {
         state.busy = false;
-        return attach(state.app, state.page).then(function () { setMessage('Saved into page ' + state.page + '. Its own CSS and JS outside the designer block are unchanged.'); });
+        return attach(state.app, state.page).then(function () {
+          setMessage('Saved into page ' + state.page + '. Its own CSS and JS outside the designer block are unchanged.');
+          if (then) then();
+        });
       })
       .catch(function (e) { state.busy = false; setMessage(e.message); renderTop(); });
-  }
-
-  // Registers an application of this workspace as a designer target; then reloads the
-  // components of the open page when it belongs to that application.
-  function addApp(app) {
-    if (!app) { setMessage('Enter an application number.'); return Promise.resolve(); }
-    setMessage('Adding application ' + app + '…');
-    return VD.repository.registerApp(app)
-      .then(function () {
-        setMessage('Application ' + app + ' added. Enter a page number and open it.');
-        if (state.page != null && state.app === app) return attach(app, state.page);
-      })
-      .catch(function (e) { setMessage(e.message); });
   }
 
   function openHistory() {
@@ -581,12 +559,28 @@
   window.VD.flutterMode = {
     enter: function () {
       host = document.getElementById('flutter-host');
-      if (state.app == null && VD.config && VD.config.app) state.app = VD.config.app;
       if (!host) return;
+      var p = VD.pageBar && VD.pageBar.current();
+      if (p && (p.app !== state.app || p.page !== state.page)) { attach(p.app, p.page); return; }
       render(!frame);
     },
+    // From the page bar; false keeps the open page (the user kept the unsaved changes).
+    open: function (app, page) {
+      if (dirty() && !window.confirm('Discard unsaved changes on this page?')) return false;
+      attach(app, page);
+      return true;
+    },
+    // false keeps the designer open: the user cancelled, or chose Save (then onLeave runs after it).
+    leave: function (onLeave) {
+      if (!dirty()) return true;
+      if (window.confirm('This page has unsaved design changes. Save them now?\n\nOK saves them; Cancel lets you discard them or stay.')) {
+        save(onLeave);
+        return false;
+      }
+      if (window.confirm('Discard the unsaved design changes?')) { state.design = VD.chartMigrate.design(JSON.parse(state.savedJson)).design; state.undo = VD.undoStack.create(100); return true; }
+      return false;
+    },
     attach: attach,
-    addApp: addApp,
     stylesFor: stylesFor,
     currentStyle: currentStyle
   };
