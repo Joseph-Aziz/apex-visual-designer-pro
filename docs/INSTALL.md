@@ -10,7 +10,7 @@
 On that first page view, the plug-in creates its tables and packages in the application's parsing schema, registers the application, and shows the designer. This takes a few seconds, once. No extra schema and no SQL scripts are needed.
 
 **Requirements:**
-- Oracle APEX 26.1 or later (tested on 26.2), and Oracle Database 19c or later.
+- Oracle APEX 26.1 or later (tested on 26.2), and Oracle Database 19c or later. Earlier APEX releases are not supported: the page writer uses the export and import format of 26.1 and later.
 - The parsing schema of the host application holds CREATE TABLE, CREATE SEQUENCE, CREATE PROCEDURE and CREATE TRIGGER. Schemas that APEX creates for a workspace have them.
 
 If the install fails, a developer who opens the page from App Builder sees which install step failed and the Oracle error; other users see a short notice. Fix the cause (usually a missing privilege) and reload the page: the install runs again.

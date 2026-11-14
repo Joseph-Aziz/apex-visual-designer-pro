@@ -67,8 +67,8 @@ A developer installs it in three steps:
   and theme file, as they are today.
 - A separate companion application.
 - Registration and role management screens (v1.1).
-- Supporting APEX releases before 26.2. The page writer depends on 26.2's export and import
-  format.
+- Supporting APEX releases before 26.1. The page writer depends on the export and import
+  format of 26.1 and later.
 
 ## Anti-goals
 
@@ -81,7 +81,7 @@ A developer installs it in three steps:
 
 ## Constraints
 
-- APEX 26.2. Plug-in files are served with the plug-in's file prefix, which APEX versions, so
+- APEX 26.1 or later (tested on 26.2). Plug-in files are served with the plug-in's file prefix, which APEX versions, so
   the Cloudflare build stamp is no longer needed. Check this live.
 - The page writer re-imports pages, which still signs users out. Document it.
 - Page writes run as the host app's parsing schema (`AUTHID CURRENT_USER`). Writing to another
