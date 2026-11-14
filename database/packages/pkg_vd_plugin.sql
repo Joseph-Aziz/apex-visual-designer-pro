@@ -30,7 +30,7 @@ END PKG_VD_PLUGIN;
 CREATE OR REPLACE PACKAGE BODY PKG_VD_PLUGIN AS
   -- Release of the editor files; it ends up in the iframe URL as ?v=, with the plug-in's file
   -- prefix (which APEX versions itself) in front of it.
-  c_version CONSTANT VARCHAR2(20) := '1.1.0';
+  c_version CONSTANT VARCHAR2(20) := '1.3.0';
 
   -- A region attribute. APEX 26.2 keeps them in p_region.attributes; the classic
   -- attribute_NN fields stay empty for regions created or edited in 26.2.

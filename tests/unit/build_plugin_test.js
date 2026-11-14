@@ -95,3 +95,14 @@ console.log('build_plugin_test: recompile checks passed');
   require('assert').ok(!/l_stmt\s*:=\s*TRIM\(DBMS_LOB\.SUBSTR/.test(boot) && /DBMS_LOB\.COPY\(l_stmt/.test(boot), 'bootstrap copies each statement as a CLOB');
   console.log('build_plugin_test: long statements passed');
 }
+
+// The region render stamps index.html?v=<c_version> so a new release gets new file URLs and
+// browsers drop cached files. The stamp must follow the release version the build writes.
+{
+  const build = fs.readFileSync(path.join(ROOT, 'tools', 'build_plugin.js'), 'utf8');
+  const pkg = fs.readFileSync(path.join(ROOT, 'database', 'packages', 'pkg_vd_plugin.sql'), 'utf8');
+  const release = build.match(/opt\('version', '([^']+)'\)/)[1];
+  const stamp = pkg.match(/c_version CONSTANT VARCHAR2\(20\) := '([^']+)'/)[1];
+  assert.strictEqual(stamp, release, 'PKG_VD_PLUGIN.c_version follows the release version');
+  console.log('build_plugin_test: file stamp passed');
+}
