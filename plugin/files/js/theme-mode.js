@@ -204,15 +204,44 @@
     }).catch(function (e) { state.busy = false; setMessage(e.message); renderTop(); });
   }
 
+  function save(name, text, type) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: type }));
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  // Export presets: the theme's named styles as a vd-presets file (spec C.6).
+  function exportPresets() {
+    save('vd-presets-app' + state.app + '.json', JSON.stringify(VD.presetFile.toFile(state.theme), null, 2), 'application/json');
+    setMessage('Downloaded the presets of app ' + state.app + '.');
+  }
+
+  // Import presets: added to the theme as unsaved changes; a taken class is renamed, nothing is overwritten.
+  function importPresets() {
+    var input = document.createElement('input');
+    input.type = 'file'; input.accept = '.json,application/json';
+    input.addEventListener('change', function () {
+      var f = input.files && input.files[0];
+      if (!f) return;
+      f.text().then(function (text) {
+        var file;
+        try { file = JSON.parse(text); } catch (e) { setMessage(f.name + ' is not a JSON file.'); return; }
+        var r = VD.presetFile.fromFile(state.theme, file);
+        if (r.error) { setMessage('Import refused: ' + r.error); return; }
+        state.theme = r.theme;
+        setMessage('Imported ' + r.added + ' preset' + (r.added === 1 ? '' : 's') +
+          (r.renamed.length ? '; renamed ' + r.renamed.map(function (x) { return 'vd-' + x.family + '-' + x.from + ' to vd-' + x.family + '-' + x.to; }).join(', ') : '') +
+          '. Save the draft to keep them.');
+        render();
+      });
+    });
+    input.click();
+  }
+
   function download() {
     var out = output('download ' + today());
-    var save = function (name, text, type) {
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([text], { type: type }));
-      a.download = name;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-    };
     save('vd-theme.css', out.css, 'text/css');
     if (out.js) save('vd-theme.js', out.js, 'text/javascript');
     setMessage(out.js ? 'Downloaded vd-theme.css and vd-theme.js (ripple and fonts).' : 'Downloaded vd-theme.css.');
@@ -254,6 +283,8 @@
       '<button class="vd-btn vd-btn--ghost' + (state.view === 'page' ? ' is-active' : '') + '" data-view-mode="page">Page</button></span>' +
       (state.view === 'page' ? '<label class="lk-inline">Page <input type="number" class="th-page" value="' + esc(state.page) + '"></label><button class="vd-btn vd-btn--secondary th-open">Show</button>' : '') +
       '<button class="vd-btn vd-btn--ghost th-history">History</button>' +
+      '<button class="vd-btn vd-btn--ghost th-export"' + (errs.length ? ' disabled' : '') + '>Export presets</button>' +
+      '<button class="vd-btn vd-btn--ghost th-import"' + (state.busy ? ' disabled' : '') + '>Import presets</button>' +
       '<button class="vd-btn vd-btn--ghost th-download"' + (errs.length ? ' disabled' : '') + '>Download CSS</button>' +
       '<button class="vd-btn vd-btn--secondary th-save"' + (blocked || !dirty() ? ' disabled' : '') + '>Save draft</button>' +
       '<button class="vd-btn vd-btn--primary th-push"' + (blocked ? ' disabled' : '') + '>Push to app</button>';
@@ -267,6 +298,8 @@
       state.page = pg; loadPreview();
     });
     top.querySelector('.th-history').addEventListener('click', openHistory);
+    top.querySelector('.th-export').addEventListener('click', exportPresets);
+    top.querySelector('.th-import').addEventListener('click', importPresets);
     top.querySelector('.th-download').addEventListener('click', download);
     top.querySelector('.th-save').addEventListener('click', saveDraft);
     top.querySelector('.th-push').addEventListener('click', push);
