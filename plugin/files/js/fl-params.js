@@ -15,19 +15,77 @@
     var f = window.VD.componentRegistry.family(type);
     return (f && f.sample) || '';
   }
-  // Six design thumbnails for a type; css styles them, each scoped to its own id.
+  // The family's sample markup with a design applied, scoped to its own id.
+  function card(type, id, variant, values) {
+    // Markup that carries id="{id}" is the element the design styles; anything else is wrapped.
+    var inner = sample(type).replace(/\{id\}/g, id);
+    return { html: sample(type).indexOf('id="{id}"') >= 0 ? inner : '<div id="' + id + '">' + inner + '</div>',
+      css: variant.css('#' + id, V().values(variant, values || {})) };
+  }
+  // The design thumbnails for a type, each with its Built-in badge.
   function thumbnails(type, current) {
     var css = '';
     var html = V().forType(type).map(function (v) {
-      var id = 'fl-thumb-' + v.id;
-      // Markup that carries id="{id}" is the element the design styles; anything else is wrapped.
-      var inner = sample(type).replace(/\{id\}/g, id);
-      var wrapped = sample(type).indexOf('id="{id}"') >= 0 ? inner : '<div id="' + id + '">' + inner + '</div>';
-      css += v.css('#' + id, V().values(v, {}));
+      var c = card(type, 'fl-thumb-' + v.id, v);
+      css += c.css;
       return '<button class="fl-variant' + (current === v.id ? ' is-selected' : '') + '" data-variant="' + v.id + '">' +
-        '<span class="fl-thumb">' + wrapped + '</span><b>' + esc(v.label) + '</b></button>';
+        '<span class="fl-thumb">' + c.html + '</span><b>' + esc(v.label) + '</b><span class="fl-badge">Built-in</span></button>';
     }).join('');
     return { html: html, css: css };
+  }
+
+  // The gallery both designers draw: the built-in designs, the application's presets for the
+  // family, and the actions on the selected design.
+  // opts: { current: design id, presets: [{ label, variant, values }], preset: index of the
+  //         selected preset, canReset: the design has values, canSave: offer Save as preset }
+  function gallery(type, opts) {
+    opts = opts || {};
+    var chosen = opts.preset != null;
+    var t = thumbnails(type, chosen ? null : opts.current), css = t.css;
+    var presets = (opts.presets || []).map(function (pr, i) {
+      var v = V().get(type, pr.variant);
+      if (!v) return '';
+      var c = card(type, 'fl-preset-' + i, v, pr.values);
+      css += c.css;
+      return '<button class="fl-variant' + (chosen && opts.preset === i ? ' is-selected' : '') + '" data-preset="' + i + '">' +
+        '<span class="fl-thumb">' + c.html + '</span><b>' + esc(pr.label) + '</b><span class="fl-badge fl-badge--custom">Custom</span></button>';
+    }).join('');
+    var actions = (opts.canReset ? '<button type="button" class="vd-btn vd-btn--ghost" data-gallery="reset" title="Keep the design and clear its settings">Reset settings</button>' : '') +
+      (opts.canSave ? '<button type="button" class="vd-btn vd-btn--ghost" data-gallery="save">Save as preset</button>' : '');
+    return { html: '<div class="fl-gallery"><div class="fl-variants">' + t.html + presets + '</div>' +
+      (actions ? '<div class="fl-gallery-actions">' + actions + '</div>' : '') + '</div>', css: css };
+  }
+  // on: { pick(designId), preset(index), reset(), save() }; a missing handler leaves its control inert.
+  function bindGallery(root, on) {
+    root.querySelectorAll('[data-variant]').forEach(function (b) {
+      b.addEventListener('click', function () { if (on.pick) on.pick(b.getAttribute('data-variant')); });
+    });
+    root.querySelectorAll('[data-preset]').forEach(function (b) {
+      b.addEventListener('click', function () { if (on.preset) on.preset(Number(b.getAttribute('data-preset'))); });
+    });
+    root.querySelectorAll('[data-gallery]').forEach(function (b) {
+      b.addEventListener('click', function () { var f = on[b.getAttribute('data-gallery')]; if (f) f(); });
+    });
+  }
+
+  // Quick palette colours: the theme's accent, then every colour its styles use, once each.
+  function themeColors(theme) {
+    var out = [];
+    var add = function (c) { c = String(c || '').toLowerCase(); if (/^#[0-9a-f]{6}$/.test(c) && out.indexOf(c) < 0) out.push(c); };
+    if (!theme) return out;
+    add(theme.global && theme.global.accent);
+    Object.keys(theme.types || {}).forEach(function (type) {
+      (theme.types[type].styles || []).forEach(function (st) {
+        Object.keys(st.values || {}).forEach(function (k) { add(st.values[k]); });
+      });
+    });
+    return out;
+  }
+  // Swatches; bind() puts a clicked one into the colour setting used last.
+  function palette(colors) {
+    return colors.length ? '<div class="fl-palette" role="group" aria-label="Theme colours"><span>Theme colours</span>' + colors.map(function (c) {
+      return '<button type="button" class="fl-swatch" data-swatch="' + c + '" style="background:' + c + '" title="' + c + '" aria-label="Use ' + c + '"></button>';
+    }).join('') + '</div>' : '';
   }
 
   function paramInput(p, value) {
@@ -115,6 +173,20 @@
         refresh();
       });
     });
+    // The quick palette fills the colour setting focused last, or the first one.
+    var lastColor = null;
+    root.querySelectorAll('input[type="color"][data-param]').forEach(function (inp) {
+      inp.addEventListener('focus', function () { lastColor = inp; });
+    });
+    root.querySelectorAll('[data-swatch]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var inp = lastColor || root.querySelector('input[type="color"][data-param]');
+        if (!inp) return;
+        inp.value = b.getAttribute('data-swatch');
+        inp.dispatchEvent(new Event('input'));
+        lastColor = inp;
+      });
+    });
     root.querySelectorAll('[data-clear]').forEach(function (b) {
       b.addEventListener('click', function () {
         b.parentNode.classList.add('is-empty');
@@ -125,5 +197,6 @@
     });
   }
 
-  window.VD.flParams = { esc: esc, sample: sample, thumbnails: thumbnails, html: html, bind: bind };
+  window.VD.flParams = { esc: esc, sample: sample, thumbnails: thumbnails, gallery: gallery, bindGallery: bindGallery,
+    themeColors: themeColors, palette: palette, html: html, bind: bind };
 })();

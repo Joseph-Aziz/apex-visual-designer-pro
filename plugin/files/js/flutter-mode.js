@@ -25,6 +25,8 @@
     usePage: false,      // true: clicks in the preview reach the page (fill items, submit) instead of selecting
     undo: null,          // undo/redo snapshots of the design (spec §7), one stack per open page
     lastField: null,     // the field typed in last, so a run of keystrokes is one undo step
+    sectionsOpen: {},    // which closed-by-default panel sections the owner opened
+    sectionsOpen: {},    // the panel sections the owner opened, by section id
     chartKey: null,      // the chart whose Chart Designer panel is open
     chartView: { node: 'chart', tab: 'all', level: 'basic', width: 'desktop', point: '' },
     chartRuntime: null   // text of the chart runtime for the live preview, loaded on demand
@@ -182,6 +184,15 @@
     render();
   }
 
+  // Keeps the design and clears its settings, as one undo step.
+  function resetValues(key) {
+    var ch = choice(key);
+    if (!ch || !Object.keys(ch.values || {}).length) return;
+    remember();
+    ch.values = {};
+    render();
+  }
+
   function setValue(key, param, value) {
     var ch = choice(key);
     if (!ch) return;
@@ -285,7 +296,7 @@
     host.innerHTML =
       '<div class="lk-top fl-top"></div><div class="lk-msg fl-msg" role="status"></div>' +
       '<div class="lk-body"><aside class="lk-left fl-left"></aside>' +
-      '<section class="lk-center"><div class="lk-preview fl-preview"></div></section>' +
+      '<section class="lk-center"><div class="lk-preview fl-preview"></div><div class="lk-status fl-status" aria-live="polite"></div></section>' +
       '<aside class="lk-right fl-right"></aside></div><style id="fl-thumbs-css"></style>';
   }
 
@@ -447,6 +458,7 @@
   }
 
   function renderRight() {
+    renderStatus();
     var right = host.querySelector('.fl-right');
     var c = state.selected && component(state.selected);
     var thumbCss = '';
@@ -469,12 +481,12 @@
       right.innerHTML = hasPage() ? '<p class="lk-hint">Select a component in the list or click it on the page.</p>' : '';
     } else {
       var ch = choice(c.key);
-      var t = VD.flParams.thumbnails(c.ftype, ch && ch.variant);
+      var t = VD.flParams.gallery(c.ftype, { current: ch && ch.variant, canReset: !!(ch && Object.keys(ch.values || {}).length) });
       thumbCss = t.css;
       var params = '';
       if (ch) {
         var variant = V().get(c.ftype, ch.variant);
-        params = VD.flParams.html(variant, ch.values, { advanced: state.advancedOpen, hide: state.hideOpen }) +
+        params = VD.flParams.palette(VD.flParams.themeColors(state.pushedTheme)) + VD.flParams.html(variant, ch.values, state.sectionsOpen) +
           '<button class="vd-btn vd-btn--ghost fl-remove">Remove design</button>';
       }
       if (c.needsStaticId) {
@@ -483,19 +495,25 @@
         host.querySelector('#fl-thumbs-css').textContent = '';
         return;
       }
-      right.innerHTML = '<h3>' + esc(c.label) + '</h3>' + themeStyleHtml(c) + '<div class="fl-variants">' + t.html + '</div>' + params;
+      right.innerHTML = '<h3>' + esc(c.label) + '</h3>' + themeStyleHtml(c) + t.html + params;
       bindThemeStyle(right, c);
-      right.querySelectorAll('[data-variant]').forEach(function (b) {
-        b.addEventListener('click', function () { setVariant(c.key, b.getAttribute('data-variant')); });
-      });
+      VD.flParams.bindGallery(right, { pick: function (id) { setVariant(c.key, id); }, reset: function () { resetValues(c.key); } });
       if (ch) {
         VD.flParams.bind(right, V().get(c.ftype, ch.variant), function (key, raw) { setValue(c.key, key, raw); },
-          function (which, open) { if (which === 'hide') state.hideOpen = open; else state.advancedOpen = open; });
+          function (which, open) { state.sectionsOpen[which] = open; });
       }
       var rm = right.querySelector('.fl-remove');
       if (rm) rm.addEventListener('click', function () { setVariant(c.key, null); });
     }
     host.querySelector('#fl-thumbs-css').textContent = thumbCss;
+  }
+  // The strip under the preview: the selected component and its design.
+  function renderStatus() {
+    var el = host.querySelector('.fl-status');
+    if (!el) return;
+    var c = state.selected && component(state.selected), ch = c && choice(c.key);
+    var design = ch && (ch.chart ? 'Chart Designer' : (V().get(c.ftype, ch.variant) || {}).label);
+    el.textContent = !hasPage() ? '' : c ? c.label + ' · ' + (design || 'No design') : 'No component selected';
   }
 
   function render(reloadFrame) {

@@ -57,7 +57,7 @@
     return t;
   }
 
-  // field: 'name' | 'cls' | 'variant'
+  // field: 'name' | 'cls' | 'variant' | 'values'
   function setStyleField(theme, type, index, field, value) {
     var t = clone(theme);
     var s = styles(t, type)[index];
@@ -238,7 +238,7 @@
     host.innerHTML =
       '<div class="lk-top th-top"></div><div class="lk-msg th-msg" role="status"></div>' +
       '<div class="lk-body"><aside class="lk-left th-left"></aside>' +
-      '<section class="lk-center"><div class="lk-preview th-preview"></div></section>' +
+      '<section class="lk-center"><div class="lk-preview th-preview"></div><div class="lk-status th-status" aria-live="polite"></div></section>' +
       '<aside class="lk-right th-right"></aside></div><style id="th-gallery-css"></style><style id="th-thumbs-css"></style>';
   }
 
@@ -319,19 +319,28 @@
   }
 
   function styleHtml(s) {
-    var variant = V().get(state.type, s.variant), thumbs = P().thumbnails(state.type, s.variant);
+    var variant = V().get(state.type, s.variant);
+    var thumbs = P().gallery(state.type, { current: s.variant, canReset: !!Object.keys(s.values || {}).length });
     host.querySelector('#th-thumbs-css').textContent = thumbs.css;
     return '<h3>' + esc(T().names[state.type]) + ' style</h3>' +
       '<label class="lk-f">Name<input type="text" class="th-name" maxlength="40" value="' + esc(s.name) + '"></label>' +
       '<label class="lk-f">Class<span class="th-cls"><code>vd-' + state.type + '-</code><input type="text" class="th-cls-input" maxlength="31" value="' + esc(s.cls) + '">' +
       '<button type="button" class="vd-btn vd-btn--ghost th-copy" title="Copy the class">Copy</button></span></label>' +
       '<label class="lk-f lk-f--chk"><input type="checkbox" class="th-default"' + (s.isDefault ? ' checked' : '') + '> Default style (components with no style class get it)</label>' +
-      '<div class="fl-variants">' + thumbs.html + '</div>' +
-      (variant ? P().html(variant, s.values, state.open) : '') +
+      thumbs.html + (variant ? P().palette(P().themeColors(state.theme)) + P().html(variant, s.values, state.open) : '') +
       '<button class="vd-btn vd-btn--ghost lk-remove th-remove">Remove style</button>';
   }
 
+  // The strip under the preview: the selected style and its design.
+  function renderStatus() {
+    var el = host.querySelector('.th-status'), s = current();
+    if (!el) return;
+    var v = s && V().get(state.type, s.variant);
+    el.textContent = s ? T().names[state.type] + ' · ' + s.name + ' · ' + (v ? v.label : 'No design') : 'Global settings';
+  }
+
   function renderRight() {
+    renderStatus();
     var right = host.querySelector('.th-right'), s = current();
     host.querySelector('#th-thumbs-css').textContent = '';
     if (state.versions) {
@@ -372,8 +381,9 @@
       if (!window.confirm('Remove the style "' + s.name + '"? Components that use vd-' + type + '-' + s.cls + ' fall back to the default once you push.')) return;
       state.theme = removeStyle(state.theme, type, i); state.type = null; state.index = -1; render();
     });
-    right.querySelectorAll('[data-variant]').forEach(function (b) {
-      b.addEventListener('click', function () { update(setStyleField(state.theme, type, i, 'variant', b.getAttribute('data-variant')), true); });
+    P().bindGallery(right, {
+      pick: function (id) { update(setStyleField(state.theme, type, i, 'variant', id), true); },
+      reset: function () { update(setStyleField(state.theme, type, i, 'values', {}), true); }
     });
     var variant = V().get(type, s.variant);
     if (variant) {

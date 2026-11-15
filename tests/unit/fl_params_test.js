@@ -34,4 +34,31 @@ assert.ok(!P.html(V.get('text', 'v1'), {}, {}).includes('data-param="ripple"'), 
 
 assert.ok(/<summary>States<\/summary>[\s\S]*data-param="disabledOpacity"/.test(P.html(V.get('text', 'v1'), {}, {})), 'States section');
 
+// ---- gallery: built-in badges, preset slot, actions
+{
+  const g = P.gallery('text', { current: 'v2', canReset: true });
+  assert.strictEqual((g.html.match(/class="fl-badge">Built-in</g) || []).length, V.forType('text').length, 'every design has a Built-in badge');
+  assert.ok(/data-variant="v2"[^>]*>|is-selected" data-variant="v2"/.test(g.html), 'current design selected');
+  assert.ok(g.html.includes('data-gallery="reset"'), 'Reset settings shown');
+  assert.ok(!g.html.includes('data-gallery="save"'), 'no Save as preset until presets exist');
+  assert.ok(!P.gallery('text', { current: 'v2' }).html.includes('data-gallery="reset"'), 'no reset without values');
+  const pg = P.gallery('text', { current: 'v1', preset: 0, canSave: true,
+    presets: [{ label: 'Brand field', variant: 'v1', values: { radius: 12 } }] });
+  assert.ok(pg.html.includes('data-preset="0"') && pg.html.includes('class="fl-badge fl-badge--custom">Custom<'), 'preset card with Custom badge');
+  assert.ok(pg.html.includes('data-gallery="save"'), 'Save as preset when allowed');
+  assert.ok(/is-selected" data-preset="0"/.test(pg.html) && !/is-selected" data-variant/.test(pg.html), 'the selected preset, not its design');
+  assert.ok(pg.css.includes('#fl-preset-0'), 'preset thumbnail styled');
+  assert.strictEqual(P.gallery('text', {}).html, P.gallery('text', {}).html, 'same gallery for both designers');
+}
+// ---- quick palette: the theme accent and the colours of its styles, once each
+{
+  const theme = { global: { accent: '#1A73E8', pageBg: '#fafafa' }, types: { text: { styles: [{ values: { accent: '#1a73e8', text: '#222222', radius: 8 } }] },
+    button: { styles: [{ values: { bg: '#ff0000', customCss: 'color:#000' } }] } } };
+  assert.strictEqual(JSON.stringify(P.themeColors(theme)), JSON.stringify(['#1a73e8', '#222222', '#ff0000']), 'accent first, then style colours, no duplicates');
+  assert.strictEqual(P.themeColors(null).length, 0, 'no theme, no swatches');
+  const pal = P.palette(['#1a73e8']);
+  assert.ok(pal.includes('data-swatch="#1a73e8"'), 'swatch drawn');
+  assert.strictEqual(P.palette([]), '', 'no palette without colours');
+}
+
 console.log('fl_params_test: all passed');
