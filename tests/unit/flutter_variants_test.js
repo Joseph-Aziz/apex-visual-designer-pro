@@ -83,7 +83,7 @@ const icoColor = F.get('select', 'v1').css('#X1', Object.assign(defaults(F.get('
 assert.ok(icoColor.includes('%23ff0000'), 'native select arrow uses the icon colour');
 
 // own Icon section for dates and lists (and nothing for plain text fields)
-const iconKeys = (t, id) => F.get(t, id).params.filter((p) => p.group === 'icon').map((p) => p.key).join();
+const iconKeys = (t, id) => F.get(t, id).params.filter((p) => p.section === 'icon').map((p) => p.key).join();
 assert.strictEqual(iconKeys('select', 'v1'), 'iconStyle,iconSize,iconColor,iconHoverBg,iconPosition', 'select icon section');
 assert.strictEqual(iconKeys('date', 'v3'), 'iconStyle,iconSize,iconColor,iconHoverBg,iconPosition', 'date icon section');
 assert.strictEqual(iconKeys('text', 'v1'), '', 'text has no icon section');
@@ -99,8 +99,8 @@ assert.ok(ic.includes(encodeURIComponent('M7 10h10l-5 6z')), 'caret shape');
 const none = sv.css('#X1', F.values(sv, { iconStyle: 'none' }));
 assert.ok(/a-Button--popupLOV::after \{[^}]*display:none/.test(none), 'icon hidden');
 assert.ok(/select \{[^}]*background-image:none/.test(none), 'native arrow hidden');
-const dv = F.get('date', 'v1');
-assert.ok(dv.css('#X1', F.values(dv, { iconStyle: 'clock' })).includes(encodeURIComponent('M12 7v5l3 2')), 'clock shape');
+const depVals = F.get('date', 'v1');
+assert.ok(depVals.css('#X1', F.values(depVals, { iconStyle: 'clock' })).includes(encodeURIComponent('M12 7v5l3 2')), 'clock shape');
 
 // cleanParam rejects injection
 assert.strictEqual(F.cleanParam({ kind: 'color' }, 'red;}</style>'), null);
@@ -136,9 +136,10 @@ F.types.forEach((t) => F.forType(t).forEach((v) => {
 const ADV = ['shadow', 'hoverBg', 'focusColor', 'focusWidth', 'fontFamily', 'letterSpacing', 'textTransform',
   'lineHeight', 'width', 'maxWidth', 'marginBlock', 'align', 'motion', 'ripple', 'customCss'];
 F.types.forEach((t) => F.forType(t).forEach((v) => {
-  const keys = v.params.filter((p) => p.group === 'advanced').map((p) => p.key);
-  assert.strictEqual(keys.join(), ADV.join(), t + v.id + ' advanced keys');
-  v.params.filter((p) => p.group === 'advanced').forEach((p) => assert.strictEqual(p.default, '', t + v.id + p.key + ' default'));
+  const keys = v.params.filter((p) => p.section === 'advanced').map((p) => p.key);
+  // Ripple on press is offered only by the designs that have a ripple.
+  assert.strictEqual(keys.join(), ADV.filter((k) => k !== 'ripple' || v.needsJs).join(), t + v.id + ' advanced keys');
+  v.params.filter((p) => p.section === 'advanced').forEach((p) => assert.strictEqual(p.default, '', t + v.id + p.key + ' default'));
 }));
 const tv = F.get('text', 'v1');
 const plain = tv.css('#X1', F.values(tv, {}));
@@ -181,7 +182,7 @@ const igCss = F.get('ig', 'v1').css('#r', F.values(F.get('ig', 'v1'), {}));
 assert.ok(igCss.includes('.a-GV') && !igCss.includes('.a-IRR'), 'ig css is ig only');
 
 // show / hide switches
-const hideKeys = (t) => F.get(t, 'v1').params.filter((p) => p.group === 'hide').map((p) => p.key).join();
+const hideKeys = (t) => F.get(t, 'v1').params.filter((p) => p.section === 'hide').map((p) => p.key).join();
 assert.strictEqual(hideKeys('ir'), 'hideSearch,hideActions,hideRowsPerPage,hideReset,hideColumnMenu,hidePagination,hideSettingsBar,hideTitle,hideRegionButtons');
 assert.strictEqual(hideKeys('ig'), 'hideToolbar,hideSearch,hideActions,hideEditSave,hideFooter,hideTitle,hideRegionButtons');
 assert.strictEqual(hideKeys('classic'), 'hidePagination,hideNoData,hideHeadings,hideTitle,hideRegionButtons');
@@ -247,6 +248,39 @@ assert.strictEqual(F.get('region', 'v1').js, undefined, 'other looks have no js'
   R.registerVariant('display', { id: 'x1', label: 'Extra', params: [], css: (sel) => 'body ' + sel + ' { color:red }' });
   assert.strictEqual(F.forType('display').length, before + 1);
   assert.strictEqual(F.get('display', 'x1').label, 'Extra');
+}
+
+{
+// ---- settings schema: bounds, sections and dependencies
+const bounded = { key: 'gap', label: 'Gap', kind: 'px', default: 8, min: 4, max: 20 };
+assert.strictEqual(F.cleanParam(bounded, '10'), 10, 'inside the bounds');
+assert.strictEqual(F.cleanParam(bounded, '4'), 4, 'min is allowed');
+assert.strictEqual(F.cleanParam(bounded, '20'), 20, 'max is allowed');
+assert.strictEqual(F.cleanParam(bounded, '3'), null, 'below min');
+assert.strictEqual(F.cleanParam(bounded, '21'), null, 'above max');
+assert.strictEqual(F.cleanParam(Object.assign({}, bounded, { kind: 'number' }), '25'), null, 'number bounds');
+const dep = { id: 'dep', label: 'Dep', css: () => '', params: [
+  { key: 'mode', label: 'Mode', kind: 'select', options: ['a', 'b', 'c'], default: 'a' },
+  bounded,
+  { key: 'gapB', label: 'Gap B', kind: 'px', default: '', dependsOn: { key: 'mode', equals: 'b' } },
+  { key: 'gapBC', label: 'Gap BC', kind: 'px', default: '', dependsOn: { key: 'mode', oneOf: ['b', 'c'] } }] };
+assert.strictEqual(F.values(dep, { gap: 30 }).gap, 8, 'out of bounds falls back to the default');
+let depVals = F.values(dep, { mode: 'a', gapB: 6, gapBC: 7 });
+assert.strictEqual(depVals.gapB, '', 'dependency false: value ignored');
+assert.strictEqual(depVals.gapBC, '', 'oneOf false: value ignored');
+depVals = F.values(dep, { mode: 'c', gapB: 6, gapBC: 7 });
+assert.strictEqual(depVals.gapB, '', 'equals b, mode c');
+assert.strictEqual(depVals.gapBC, 7, 'oneOf true');
+assert.strictEqual(F.values(dep, { mode: 'b', gapB: 6 }).gapB, 6, 'equals true');
+assert.strictEqual(F.active(dep, dep.params[2], { mode: 'b' }), true);
+assert.strictEqual(F.active(dep, dep.params[2], { mode: 'a' }), false);
+// the registry checks the new fields
+const bad = (params) => assert.throws(() => window.VD.componentRegistry.registerVariant('display', { id: 'bad', label: 'Bad', css: () => '', params }));
+bad([{ key: 'x', label: 'X', kind: 'px', default: '', min: 10, max: 2 }]);
+bad([{ key: 'x', label: 'X', kind: 'select', options: ['a'], default: '', min: 1 }]);
+bad([{ key: 'x', label: 'X', kind: 'px', default: '', section: 'nowhere' }]);
+bad([{ key: 'x', label: 'X', kind: 'px', default: '', dependsOn: { key: 'missing', equals: 'a' } }]);
+bad([{ key: 'm', label: 'M', kind: 'select', options: ['a'], default: 'a' }, { key: 'x', label: 'X', kind: 'px', default: '', dependsOn: { key: 'm' } }]);
 }
 
 console.log('flutter_variants_test: all passed');

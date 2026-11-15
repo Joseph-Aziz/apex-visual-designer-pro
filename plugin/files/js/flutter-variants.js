@@ -109,11 +109,11 @@
   // The Icon section of dates and lists; empty values keep the look of the chosen design.
   function iconParams(styles) {
     return [
-      { key: 'iconStyle', label: 'Icon', kind: 'select', options: styles.concat('none'), default: '', group: 'icon' },
-      { key: 'iconSize', label: 'Icon size', kind: 'px', default: '', group: 'icon' },
-      { key: 'iconColor', label: 'Icon colour', kind: 'color', default: '', group: 'icon' },
-      { key: 'iconHoverBg', label: 'Icon hover background', kind: 'color', default: '', group: 'icon' },
-      { key: 'iconPosition', label: 'Icon position', kind: 'select', options: ['end', 'start'], default: '', group: 'icon' }
+      { key: 'iconStyle', label: 'Icon', kind: 'select', options: styles.concat('none'), default: '', section: 'icon' },
+      { key: 'iconSize', label: 'Icon size', kind: 'px', default: '', section: 'icon' },
+      { key: 'iconColor', label: 'Icon colour', kind: 'color', default: '', section: 'icon' },
+      { key: 'iconHoverBg', label: 'Icon hover background', kind: 'color', default: '', section: 'icon' },
+      { key: 'iconPosition', label: 'Icon position', kind: 'select', options: ['end', 'start'], default: '', section: 'icon' }
     ];
   }
   function svg(name, color) {
@@ -441,7 +441,7 @@
     tajawal: { stack: 'Tajawal, system-ui, sans-serif', google: 'Tajawal' },
     serif: { stack: 'Georgia, "Times New Roman", serif' }
   };
-  function ADV(key, label, kind, options) { var o = p(key, label, kind, ''); o.group = 'advanced'; if (options) o.options = options; return o; }
+  function ADV(key, label, kind, options) { var o = p(key, label, kind, ''); o.section = 'advanced'; if (options) o.options = options; return o; }
   var advancedParams = [
     ADV('shadow', 'Shadow', 'select', ['none', 'sm', 'md', 'lg']),
     ADV('hoverBg', 'Hover background', 'color'),
@@ -511,7 +511,7 @@
   function hideParams(type) {
     return Object.keys(HIDES[type] || {}).map(function (key) {
       var o = p(key, key === 'hideLabel' && type === 'button' ? 'Label (icon only)' : HIDE_LABELS[key], 'select', '');
-      o.group = 'hide'; o.options = ['show', 'hide'];
+      o.section = 'hide'; o.options = ['show', 'hide'];
       return o;
     });
   }
@@ -528,7 +528,9 @@
     var extra = advancedCss(type), hide = hideCss(type), hp = hideParams(type);
     LIBRARY[type] = LIBRARY[type].map(function (v) {
       var base = v.css;
-      var out = { type: v.type, id: v.id, label: v.label, needsJs: v.needsJs, params: v.params.concat(hp, advancedParams),
+      // Ripple on press is offered only by the designs that have a ripple.
+      var adv = advancedParams.filter(function (prm) { return prm.key !== 'ripple' || v.needsJs; });
+      var out = { type: v.type, id: v.id, label: v.label, needsJs: v.needsJs, params: v.params.concat(hp, adv),
         css: function (sel, vals) { return base(sel, vals) + hide(sel, vals) + extra(sel, vals); } };
       if (v.font) out.font = v.font;
       if (v.js) out.js = v.js;
@@ -623,7 +625,10 @@
       switch (param.kind) {
         case 'color': return PATTERNS.color.test(s) ? s : null;
         case 'icon': return PATTERNS.icon.test(s) ? s : null;
-        case 'px': case 'number': return /^\d{1,4}(\.\d{1,2})?$/.test(s) ? Number(s) : null;
+        case 'px': case 'number':
+          if (!/^\d{1,4}(\.\d{1,2})?$/.test(s)) return null;
+          var n = Number(s);
+          return (param.min != null && n < param.min) || (param.max != null && n > param.max) ? null : n;
         case 'weight': return /^[1-9]00$/.test(s) ? Number(s) : null;
         case 'select': return (param.options || []).indexOf(s) >= 0 ? s : null;
         case 'css': // declarations only, applied inside one scoped rule
@@ -634,13 +639,23 @@
     },
     // Google Fonts family name for a font key, or null for local fonts.
     googleFont: function (key) { return (FONTS[key] && FONTS[key].google) || null; },
-    // Parameter values for a variant: defaults overlaid with cleaned owner values.
+    // Whether a setting applies, given the variant's values: a setting whose dependsOn
+    // condition is false is not drawn and not generated.
+    active: function (variant, prm, vals) {
+      var d = prm.dependsOn;
+      if (!d) return true;
+      var v = vals[d.key];
+      return d.oneOf ? d.oneOf.indexOf(v) >= 0 : v === d.equals;
+    },
+    // Parameter values for a variant: defaults overlaid with cleaned owner values. A setting
+    // whose dependency is false keeps its default.
     values: function (variant, given) {
-      var out = {};
+      var F = window.VD.flutterVariants, out = {};
       variant.params.forEach(function (prm) {
-        var v = given && given[prm.key] != null ? window.VD.flutterVariants.cleanParam(prm, given[prm.key]) : null;
+        var v = given && given[prm.key] != null ? F.cleanParam(prm, given[prm.key]) : null;
         out[prm.key] = v == null ? prm.default : v;
       });
+      variant.params.forEach(function (prm) { if (!F.active(variant, prm, out)) out[prm.key] = prm.default; });
       return out;
     }
   };

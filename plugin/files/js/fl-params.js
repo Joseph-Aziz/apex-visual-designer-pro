@@ -38,7 +38,7 @@
       }).join('') + '</select>';
     }
     if (p.kind === 'css') return '<textarea rows="3" data-param="' + p.key + '" placeholder="opacity:.9; cursor:pointer" spellcheck="false">' + esc(v) + '</textarea>';
-    if (p.group && p.kind === 'color') {
+    if (p.section && p.kind === 'color') {
       // A colour picker that can also be empty ("as the design has it"): × clears it.
       var empty = !/^#[0-9a-f]{6}$/i.test(v);
       return '<span class="fl-color' + (empty ? ' is-empty' : '') + '"><input type="color" data-param="' + p.key + '" value="' + esc(empty ? '#ffffff' : v) + '"' +
@@ -60,27 +60,47 @@
       params.map(field).join('') + '</details>' : '';
   }
 
-  // openState: { advanced, hide } — the Icon section is always open.
+  // The panel sections after Basic, in order. A setting with no section is Basic, drawn first.
+  var SECTIONS = [
+    { id: 'icon', cls: 'fl-icon-section', label: 'Icon', open: true },
+    { id: 'hide', cls: 'fl-hide-section', label: 'Show / hide' },
+    { id: 'advanced', cls: 'fl-adv-section', label: 'Advanced' }
+  ];
+
+  // openState: { advanced, hide } — the Icon section is always open. A setting whose dependency
+  // is false is drawn hidden; bind shows it when the setting it depends on changes.
   function html(variant, values, openState) {
     values = values || {}; openState = openState || {};
+    var vals = V().values(variant, values);
     var field = function (p) {
-      return '<label class="fl-param"><span>' + esc(p.label) + '</span>' + paramInput(p, values[p.key]) + '</label>';
+      return '<label class="fl-param" data-for="' + esc(p.key) + '"' + (V().active(variant, p, vals) ? '' : ' hidden') + '><span>' +
+        esc(p.label) + '</span>' + paramInput(p, values[p.key]) + '</label>';
     };
-    var of = function (g) { return variant.params.filter(function (p) { return p.group === g; }); };
-    return '<h3>' + esc(variant.label) + ' settings</h3>' +
-      variant.params.filter(function (p) { return !p.group; }).map(field).join('') +
-      section('fl-icon-section', 'Icon', of('icon'), true, field) +
-      section('fl-hide-section', 'Show / hide', of('hide'), openState.hide, field) +
-      section('fl-adv-section', 'Advanced', of('advanced').filter(function (p) { return p.key !== 'ripple' || variant.needsJs; }), openState.advanced, field);
+    var of = function (id) { return variant.params.filter(function (p) { return (p.section || 'basic') === id; }); };
+    return '<h3>' + esc(variant.label) + ' settings</h3>' + of('basic').map(field).join('') +
+      SECTIONS.map(function (sc) { return section(sc.cls, sc.label, of(sc.id), sc.open || openState[sc.id], field); }).join('');
   }
 
   // Wires the inputs html() made: onValue(key, raw) on every change ('' = back to default),
   // onToggle('hide' | 'advanced', open) when a section opens or closes.
   function bind(root, variant, onValue, onToggle) {
-    [['.fl-hide-section', 'hide'], ['.fl-adv-section', 'advanced']].forEach(function (s) {
-      var d = root.querySelector(s[0]);
-      if (d && onToggle) d.addEventListener('toggle', function () { onToggle(s[1], d.open); });
+    SECTIONS.forEach(function (sc) {
+      var d = root.querySelector('.' + sc.cls);
+      if (d && onToggle && !sc.open) d.addEventListener('toggle', function () { onToggle(sc.id, d.open); });
     });
+    // Shows or hides the settings that depend on others, from the values now in the inputs.
+    function refresh() {
+      var raw = {};
+      root.querySelectorAll('[data-param]').forEach(function (inp) {
+        var v = inp.value.trim();
+        if (v !== '' && !(inp.parentNode.classList.contains('is-empty'))) raw[inp.getAttribute('data-param')] = v;
+      });
+      var vals = V().values(variant, raw);
+      variant.params.forEach(function (p) {
+        var row = p.dependsOn && root.querySelector('[data-for="' + p.key + '"]');
+        if (row) row.hidden = !V().active(variant, p, vals);
+      });
+    }
     root.querySelectorAll('[data-param]').forEach(function (inp) {
       inp.addEventListener(inp.tagName === 'SELECT' ? 'change' : 'input', function () {
         var key = inp.getAttribute('data-param');
@@ -91,6 +111,7 @@
         inp.title = bad ? 'Not allowed here; the default is used.' : '';
         if (inp.parentNode.classList.contains('fl-color')) { inp.parentNode.classList.remove('is-empty'); inp.title = raw; }
         onValue(key, raw);
+        refresh();
       });
     });
     root.querySelectorAll('[data-clear]').forEach(function (b) {
@@ -98,6 +119,7 @@
         b.parentNode.classList.add('is-empty');
         b.previousSibling.title = 'Default (not set)';
         onValue(b.getAttribute('data-clear'), '');
+        refresh();
       });
     });
   }

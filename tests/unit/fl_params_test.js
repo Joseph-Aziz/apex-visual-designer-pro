@@ -21,4 +21,15 @@ assert.ok(!P.html(V.get('text', 'v1'), { accent: '"><script>x</script>' }, {}).i
 assert.ok(P.sample('ir').includes('a-IRR-table'), 'ir sample');
 assert.ok(P.sample('text').includes('t-Form-fieldContainer'), 'field sample');
 
+// sections come from each setting's section; a setting whose dependency is false is not drawn
+const depV = { id: 'dep', label: 'Dep', params: [
+  { key: 'mode', label: 'Mode', kind: 'select', options: ['a', 'b'], default: 'a' },
+  { key: 'gapB', label: 'Gap B', kind: 'px', default: '', section: 'advanced', dependsOn: { key: 'mode', equals: 'b' } }] };
+assert.ok(/<label class="fl-param" data-for="gapB" hidden>/.test(P.html(depV, { mode: 'a' }, {})), 'dependency false: hidden');
+assert.ok(P.html(depV, { mode: 'b' }, {}).includes('fl-adv-section'), 'dependency true: advanced section drawn');
+assert.ok(/<label class="fl-param" data-for="gapB">/.test(P.html(depV, { mode: 'b' }, {})), 'dependency true: shown');
+// ripple is drawn only for designs that have one
+assert.ok(P.html(V.get('button', 'v1'), {}, {}).includes('data-param="ripple"'), 'button has ripple');
+assert.ok(!P.html(V.get('text', 'v1'), {}, {}).includes('data-param="ripple"'), 'text has no ripple');
+
 console.log('fl_params_test: all passed');

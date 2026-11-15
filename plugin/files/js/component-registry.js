@@ -18,6 +18,7 @@
     ['region', 'Regions'], ['report', 'Reports']];
   var KINDS = ['item', 'button', 'region'];
   var SETTING_KINDS = ['color', 'px', 'number', 'weight', 'select', 'css', 'icon'];
+  var SECTIONS = ['basic', 'icon', 'hide', 'advanced'];
   var ID = /^[a-z][a-z0-9-]{0,30}$/;
 
   var list = [];
@@ -27,12 +28,27 @@
   function has(arr, v) { return arr.indexOf(v) >= 0; }
   function find(id) { return list.filter(function (f) { return f.id === id; })[0] || null; }
 
+  // A setting: { key, label, kind, default, options, min, max, section, dependsOn }.
+  // dependsOn is { key, equals } or { key, oneOf: [...] }, on another setting of the same list.
   function checkSettings(what, settings) {
+    var keys = (settings || []).map(function (s) { return s && s.key; });
     (settings || []).forEach(function (s) {
       if (!s || !text(s.key) || !text(s.label)) fail(what, 'a setting needs a key and a label');
-      if (!has(SETTING_KINDS, s.kind)) fail(what, 'setting ' + s.key + ' has the unknown kind ' + s.kind);
-      if (!('default' in s)) fail(what, 'setting ' + s.key + ' needs a default (an empty string means "as the design has it")');
-      if (s.kind === 'select' && !(s.options && s.options.length)) fail(what, 'setting ' + s.key + ' needs options');
+      var name = 'setting ' + s.key;
+      if (!has(SETTING_KINDS, s.kind)) fail(what, name + ' has the unknown kind ' + s.kind);
+      if (!('default' in s)) fail(what, name + ' needs a default (an empty string means "as the design has it")');
+      if (s.kind === 'select' && !(s.options && s.options.length)) fail(what, name + ' needs options');
+      if (s.min != null || s.max != null) {
+        if (s.kind !== 'px' && s.kind !== 'number') fail(what, name + ': only px and number settings have bounds');
+        if ((s.min != null && typeof s.min !== 'number') || (s.max != null && typeof s.max !== 'number')) fail(what, name + ': bounds must be numbers');
+        if (s.min != null && s.max != null && s.min > s.max) fail(what, name + ': min is above max');
+      }
+      if (s.section != null && !has(SECTIONS, s.section)) fail(what, name + ' has the unknown section ' + s.section);
+      if (s.dependsOn != null) {
+        var d = s.dependsOn;
+        if (!d || d.key === s.key || !has(keys, d.key)) fail(what, name + ' depends on a setting that is not in its list');
+        if (!('equals' in d) && !Array.isArray(d.oneOf)) fail(what, name + ': dependsOn needs equals or oneOf');
+      }
     });
   }
 
