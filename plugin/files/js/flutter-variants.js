@@ -575,13 +575,26 @@
 
   // ---- the built-in families: what each one is called, where it is listed, and which APEX
   // components belong to it. The family id is stored in saved designs and themes; never rename one.
-  function items(list) { return list.map(function (m) { return { kind: 'item', apexType: m[0], label: m[1] }; }); }
+  function items(list) {
+    return list.map(function (m) { var x = { kind: 'item', apexType: m[0], label: m[1] }; if (m[2]) x.sample = m[2]; return x; });
+  }
   function reportOf(component) { return function (c) { return c.kind === 'region' && c.component === component; }; }
   // Sample markup. A design thumbnail replaces {id} with its own id; markup without id="{id}" is
   // wrapped in an element that carries the id. A theme sample replaces {cls} with the style class.
   // themeMark tells the family apart from the others of its surface in the page markup.
   var FIELD = '<div class="t-Form-fieldContainer"><div class="t-Form-labelContainer"><label class="t-Form-label">Label</label></div>' +
     '<div class="t-Form-inputContainer"><input class="text_field apex-item-text" value="Text"></div></div>';
+  // A field sample around other input markup, for the members of a field family.
+  function field(input) {
+    return '<div class="t-Form-fieldContainer"><div class="t-Form-labelContainer"><label class="t-Form-label">Label</label></div>' +
+      '<div class="t-Form-inputContainer">' + input + '</div></div>';
+  }
+  function options(type, n) {
+    var html = '';
+    for (var i = 0; i < n; i++) html += '<div class="apex-item-option"><input type="' + type + '"' + (i === 0 ? ' checked' : '') +
+      ' id="{id}-' + i + '"><label for="{id}-' + i + '">' + ['One', 'Two', 'Three'][i] + '</label></div>';
+    return html;
+  }
   var TABLE = {
     classic: '<table class="t-Report-report"><thead><tr><th>Name</th><th>Date</th></tr></thead><tr><td>One</td><td>1</td></tr><tr><td>Two</td><td>2</td></tr></table>',
     ir: '<table class="a-IRR-table"><tr><th class="a-IRR-header">Name</th><th class="a-IRR-header">Date</th></tr><tr><td>One</td><td>1</td></tr><tr><td>Two</td><td>2</td></tr></table>',
@@ -592,7 +605,10 @@
 
   var FAMILIES = [
     { id: 'text', label: 'Text field', plural: 'Text fields', category: 'form', surface: 'item',
-      members: items([['NATIVE_TEXT_FIELD', 'Text Field'], ['NATIVE_TEXTAREA', 'Textarea'], ['NATIVE_NUMBER_FIELD', 'Number Field'], ['NATIVE_PASSWORD', 'Password']]),
+      members: items([['NATIVE_TEXT_FIELD', 'Text Field', FIELD],
+        ['NATIVE_TEXTAREA', 'Textarea', field('<textarea class="textarea apex-item-textarea" rows="2">Some longer text</textarea>')],
+        ['NATIVE_NUMBER_FIELD', 'Number Field', field('<input class="number_field apex-item-text apex-item-number" value="1,250">')],
+        ['NATIVE_PASSWORD', 'Password', field('<input type="password" class="password apex-item-text" value="secret">')]]),
       sample: FIELD, themeMark: ':has(input.text_field, textarea)',
       themeSample: '<input class="text_field apex-item-text{cls}" value="Text">' },
     { id: 'date', label: 'Date picker', plural: 'Date pickers', category: 'form', surface: 'item',
@@ -600,11 +616,15 @@
       sample: FIELD, themeMark: ':has(.apex-item-datepicker, .a-DatePicker)',
       themeSample: '<span class="apex-item-datepicker"><input class="text_field apex-item-text{cls}" value="2026-11-11"></span>' },
     { id: 'select', label: 'List', plural: 'Lists', category: 'form', surface: 'item',
-      members: items([['NATIVE_SELECT_LIST', 'Select List'], ['NATIVE_POPUP_LOV', 'Popup LOV'], ['NATIVE_COMBOBOX', 'Combobox']]),
+      members: items([['NATIVE_SELECT_LIST', 'Select List', field('<select class="selectlist apex-item-select"><option>One</option></select>')],
+        ['NATIVE_POPUP_LOV', 'Popup LOV', field('<input class="apex-item-text apex-item-popup-lov" value="One"><button type="button" class="a-Button a-Button--popupLOV">&#9662;</button>')],
+        ['NATIVE_COMBOBOX', 'Combobox', field('<div class="a-Combobox"><input class="apex-item-text apex-item-combobox" value="One"></div>')]]),
       sample: FIELD, themeMark: ':has(select, .apex-item-popup-lov, .a-Combobox)',
       themeSample: '<select class="selectlist apex-item-select{cls}"><option>One</option></select>' },
     { id: 'choice', label: 'Checkbox or radio', plural: 'Checkboxes and radios', category: 'selection', surface: 'item',
-      members: items([['NATIVE_CHECKBOX', 'Checkbox Group'], ['NATIVE_RADIOGROUP', 'Radio Group'], ['NATIVE_SINGLE_CHECKBOX', 'Checkbox']]),
+      members: items([['NATIVE_CHECKBOX', 'Checkbox Group', '<div class="apex-item-group apex-item-checkbox">' + options('checkbox', 3) + '</div>'],
+        ['NATIVE_RADIOGROUP', 'Radio Group', '<div class="apex-item-group apex-item-radio">' + options('radio', 2) + '</div>'],
+        ['NATIVE_SINGLE_CHECKBOX', 'Checkbox', '<div class="apex-item-single-checkbox"><div class="apex-item-option"><input type="checkbox" checked id="{id}-0"><label for="{id}-0">Accept</label></div></div>']]),
       sample: '<div class="apex-item-group"><div class="apex-item-option"><input type="radio" checked id="{id}-a"><label for="{id}-a">One</label></div>' +
         '<div class="apex-item-option"><input type="radio" id="{id}-b"><label for="{id}-b">Two</label></div></div>',
       themeMark: ':has(.apex-item-checkbox, .apex-item-radio)',
@@ -620,7 +640,8 @@
       sample: '<span class="display_only">Value</span>', themeMark: ':has(.display_only)',
       themeSample: '<span class="display_only{cls}">Value</span>' },
     { id: 'region', label: 'Region', plural: 'Regions', category: 'region', surface: 'region',
-      members: [{ kind: 'region', label: 'Standard Region' }, { kind: 'region', apexType: 'NATIVE_STATIC', label: 'Static Content' }],
+      members: [{ kind: 'region', label: 'Standard Region' }, { kind: 'region', apexType: 'NATIVE_STATIC', label: 'Static Content',
+        sample: '<div class="t-Region t-Region--noUI" id="{id}"><div class="t-Region-body">Static content: text, links and images.</div></div>' }],
       sample: '<div class="t-Region" id="{id}"><div class="t-Region-header"><h2 class="t-Region-title">Title</h2></div><div class="t-Region-body">Body</div></div>',
       themeMark: ':not(:has(.a-CardView, .a-IRR, .a-IG, .t-Report))', themeSample: 'Body text' },
     { id: 'classic', label: 'Classic report', plural: 'Classic reports', category: 'report', surface: 'region',

@@ -633,7 +633,7 @@
       var ch = choice(c.key);
       var presets = presetsFor(state.theme, c.ftype);
       var pi = ch && ch.presetOf ? presets.map(function (x) { return x.cls; }).indexOf(ch.presetOf) : -1;
-      var t = VD.flParams.gallery(c.ftype, { current: ch && ch.variant, presets: presets, preset: pi >= 0 ? pi : null,
+      var t = VD.flParams.gallery(c.ftype, { member: VD.flParams.memberOf(c.ftype, c), current: ch && ch.variant, presets: presets, preset: pi >= 0 ? pi : null,
         canReset: !!(ch && Object.keys(ch.values || {}).length), canSave: !!(ch && ch.variant) && !state.busy });
       thumbCss = t.css;
       var params = '';
@@ -669,7 +669,7 @@
     var m = f && f.members.filter(function (x) { return x.label === state.browse.member; })[0];
     if (!m) { state.browse = null; renderRight(); return; }
     var mine = memberComponents(f, m, state.components);
-    var t = f.editor === 'chart' ? { html: '<p class="lk-hint">Charts are styled with the Chart Designer.</p>', css: '' } : VD.flParams.gallery(f.id, {});
+    var t = f.editor === 'chart' ? { html: '<p class="lk-hint">Charts are styled with the Chart Designer.</p>', css: '' } : VD.flParams.gallery(f.id, { member: m });
     right.innerHTML = '<h3>' + esc(m.label) + '</h3>' +
       (mine.length ? '<p class="lk-hint">Choose a component to design it:</p>' + mine.map(function (c) {
         return '<button class="lk-slot" data-key="' + esc(c.key) + '"><b>' + esc(c.label) + '</b></button>';

@@ -74,6 +74,7 @@
     def.members.forEach(function (m) {
       if (!m || !has(KINDS, m.kind)) fail(what, 'a member kind must be item, button or region');
       if (!text(m.label)) fail(what, 'a member needs a label');
+      if (m.sample != null && typeof m.sample !== 'string') fail(what, 'the sample of member ' + m.label + ' must be markup text');
     });
     if (def.surface && !has(KINDS, def.surface)) fail(what, 'the surface must be item, button or region');
     if (def.match && typeof def.match !== 'function') fail(what, 'match must be a function');

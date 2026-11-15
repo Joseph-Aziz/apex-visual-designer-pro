@@ -10,23 +10,31 @@
     });
   }
 
-  // The family's thumbnail markup, with {id} left in for the thumbnail's own id.
-  function sample(type) {
+  // The thumbnail markup of a member, else of its family, with {id} left in for the thumbnail's own id.
+  function sample(type, member) {
+    if (member && member.sample) return member.sample;
     var f = window.VD.componentRegistry.family(type);
     return (f && f.sample) || '';
   }
-  // The family's sample markup with a design applied, scoped to its own id.
-  function card(type, id, variant, values) {
+  // The sample markup with a design applied, scoped to its own id.
+  function card(type, id, variant, values, member) {
     // Markup that carries id="{id}" is the element the design styles; anything else is wrapped.
-    var inner = sample(type).replace(/\{id\}/g, id);
-    return { html: sample(type).indexOf('id="{id}"') >= 0 ? inner : '<div id="' + id + '">' + inner + '</div>',
+    var raw = sample(type, member), inner = raw.replace(/\{id\}/g, id);
+    return { html: raw.indexOf('id="{id}"') >= 0 ? inner : '<div id="' + id + '">' + inner + '</div>',
       css: variant.css('#' + id, V().values(variant, values || {})) };
   }
+  // The member of family type that a page component is, or null: its own type, else the catch-all.
+  function memberOf(type, c) {
+    var f = c && window.VD.componentRegistry.family(type);
+    if (!f) return null;
+    return f.members.filter(function (m) { return m.kind === c.kind && m.apexType && m.apexType === c.type; })[0] ||
+      f.members.filter(function (m) { return m.kind === c.kind && !m.apexType; })[0] || null;
+  }
   // The design thumbnails for a type, each with its Built-in badge.
-  function thumbnails(type, current) {
+  function thumbnails(type, current, member) {
     var css = '';
     var html = V().forType(type).map(function (v) {
-      var c = card(type, 'fl-thumb-' + v.id, v);
+      var c = card(type, 'fl-thumb-' + v.id, v, null, member);
       css += c.css;
       return '<button class="fl-variant' + (current === v.id ? ' is-selected' : '') + '" data-variant="' + v.id + '">' +
         '<span class="fl-thumb">' + c.html + '</span><b>' + esc(v.label) + '</b><span class="fl-badge">Built-in</span></button>';
@@ -37,15 +45,16 @@
   // The gallery both designers draw: the built-in designs, the application's presets for the
   // family, and the actions on the selected design.
   // opts: { current: design id, presets: [{ label, variant, values }], preset: index of the
-  //         selected preset, canReset: the design has values, canSave: offer Save as preset }
+  //         selected preset, canReset: the design has values, canSave: offer Save as preset,
+  //         member: the registry member whose sample the cards draw }
   function gallery(type, opts) {
     opts = opts || {};
     var chosen = opts.preset != null;
-    var t = thumbnails(type, chosen ? null : opts.current), css = t.css;
+    var t = thumbnails(type, chosen ? null : opts.current, opts.member), css = t.css;
     var presets = (opts.presets || []).map(function (pr, i) {
       var v = V().get(type, pr.variant);
       if (!v) return '';
-      var c = card(type, 'fl-preset-' + i, v, pr.values);
+      var c = card(type, 'fl-preset-' + i, v, pr.values, opts.member);
       css += c.css;
       return '<button class="fl-variant' + (chosen && opts.preset === i ? ' is-selected' : '') + '" data-preset="' + i + '">' +
         '<span class="fl-thumb">' + c.html + '</span><b>' + esc(pr.label) + '</b><span class="fl-badge fl-badge--custom">Custom</span></button>';
@@ -205,6 +214,6 @@
     });
   }
 
-  window.VD.flParams = { esc: esc, sample: sample, thumbnails: thumbnails, gallery: gallery, bindGallery: bindGallery,
+  window.VD.flParams = { esc: esc, sample: sample, thumbnails: thumbnails, gallery: gallery, memberOf: memberOf, bindGallery: bindGallery,
     themeColors: themeColors, palette: palette, html: html, bind: bind };
 })();
