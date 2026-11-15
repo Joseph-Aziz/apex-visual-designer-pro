@@ -5,7 +5,7 @@ const assert = require('assert');
 
 const window = {};
 const ctx = { window, JSON, URL };
-['plugin/files/js/look-selectors.js', 'plugin/files/js/flutter-variants.js', 'plugin/files/js/flutter-codegen.js'].forEach((f) =>
+['plugin/files/js/look-selectors.js', 'plugin/files/js/component-registry.js', 'plugin/files/js/flutter-variants.js', 'plugin/files/js/flutter-codegen.js'].forEach((f) =>
   vm.runInNewContext(fs.readFileSync(f, 'utf8'), ctx, { filename: f }));
 const G = window.VD.flutterCodegen;
 assert.ok(G, 'VD.flutterCodegen is undefined');

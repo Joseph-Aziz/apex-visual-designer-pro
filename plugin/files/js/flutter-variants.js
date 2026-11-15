@@ -1,8 +1,9 @@
 /* APEX Visual Designer — Flutter (Material 3) variant library.
    Each component type has six variants. A variant turns a scoped selector
    and its parameter values into CSS rules on the native APEX markup; nothing in the
-   DOM is replaced, so APEX behaviour is untouched. To add a variant or a type, add an
-   entry to LIBRARY. */
+   DOM is replaced, so APEX behaviour is untouched. The families are registered in the
+   component registry (component-registry.js); VD.flutterVariants reads them from there.
+   A new family or design can be registered from a file of its own. */
 (function () {
   window.VD = window.VD || {};
   var S = window.VD.lookSelectors['26.2'];
@@ -535,13 +536,37 @@
     });
   });
 
-  var ITEM_TYPES = {
-    NATIVE_TEXT_FIELD: 'text', NATIVE_TEXTAREA: 'text', NATIVE_NUMBER_FIELD: 'text', NATIVE_PASSWORD: 'text',
-    NATIVE_DATE_PICKER_APEX: 'date', NATIVE_DATEPICKER_APEX: 'date', NATIVE_DATE_PICKER: 'date',
-    NATIVE_SELECT_LIST: 'select', NATIVE_POPUP_LOV: 'select', NATIVE_COMBOBOX: 'select',
-    NATIVE_CHECKBOX: 'choice', NATIVE_RADIOGROUP: 'choice', NATIVE_SINGLE_CHECKBOX: 'choice',
-    NATIVE_YES_NO: 'switch', NATIVE_DISPLAY_ONLY: 'display'
-  };
+  // ---- the built-in families: what each one is called, where it is listed, and which APEX
+  // components belong to it. The family id is stored in saved designs and themes; never rename one.
+  function items(list) { return list.map(function (m) { return { kind: 'item', apexType: m[0], label: m[1] }; }); }
+  function reportOf(component) { return function (c) { return c.kind === 'region' && c.component === component; }; }
+  var FAMILIES = [
+    { id: 'text', label: 'Text field', plural: 'Text fields', category: 'form',
+      members: items([['NATIVE_TEXT_FIELD', 'Text Field'], ['NATIVE_TEXTAREA', 'Textarea'], ['NATIVE_NUMBER_FIELD', 'Number Field'], ['NATIVE_PASSWORD', 'Password']]) },
+    { id: 'date', label: 'Date picker', plural: 'Date pickers', category: 'form',
+      members: items([['NATIVE_DATE_PICKER_APEX', 'Date Picker'], ['NATIVE_DATEPICKER_APEX', 'Date Picker'], ['NATIVE_DATE_PICKER', 'Date Picker']]) },
+    { id: 'select', label: 'List', plural: 'Lists', category: 'form',
+      members: items([['NATIVE_SELECT_LIST', 'Select List'], ['NATIVE_POPUP_LOV', 'Popup LOV'], ['NATIVE_COMBOBOX', 'Combobox']]) },
+    { id: 'choice', label: 'Checkbox or radio', plural: 'Checkboxes and radios', category: 'selection',
+      members: items([['NATIVE_CHECKBOX', 'Checkbox Group'], ['NATIVE_RADIOGROUP', 'Radio Group'], ['NATIVE_SINGLE_CHECKBOX', 'Checkbox']]) },
+    { id: 'switch', label: 'Switch', plural: 'Switches', category: 'selection', members: items([['NATIVE_YES_NO', 'Switch']]) },
+    { id: 'button', label: 'Button', plural: 'Buttons', category: 'action', members: [{ kind: 'button', label: 'Button' }] },
+    { id: 'display', label: 'Display only', plural: 'Display only', category: 'display', members: items([['NATIVE_DISPLAY_ONLY', 'Display Only']]) },
+    { id: 'region', label: 'Region', plural: 'Regions', category: 'region',
+      members: [{ kind: 'region', label: 'Standard Region' }, { kind: 'region', apexType: 'NATIVE_STATIC', label: 'Static Content' }] },
+    { id: 'classic', label: 'Classic report', plural: 'Classic reports', category: 'report',
+      members: [{ kind: 'region', apexType: 'NATIVE_SQL_REPORT', label: 'Classic Report' }], match: reportOf('classic') },
+    { id: 'ir', label: 'Interactive report', plural: 'Interactive reports', category: 'report',
+      members: [{ kind: 'region', apexType: 'NATIVE_IR', label: 'Interactive Report' }], match: reportOf('ir') },
+    { id: 'ig', label: 'Interactive grid', plural: 'Interactive grids', category: 'report',
+      members: [{ kind: 'region', apexType: 'NATIVE_IG', label: 'Interactive Grid' }], match: reportOf('ig') },
+    { id: 'cards', label: 'Cards', plural: 'Cards', category: 'region', members: [{ kind: 'region', apexType: 'NATIVE_CARDS', label: 'Cards' }] },
+    // Charts have no designs here: the Chart Designer is their editor.
+    { id: 'chart', label: 'Chart', plural: 'Charts', category: 'region', editor: 'chart',
+      members: [{ kind: 'region', apexType: 'NATIVE_JET_CHART', label: 'Chart' }] }
+  ];
+  var REG = window.VD.componentRegistry;
+  FAMILIES.forEach(function (f) { f.variants = LIBRARY[f.id]; REG.register(f); });
 
   var PATTERNS = {
     color: /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20}|rgba?\(\s*[\d.\s,%]+\))$/,
@@ -549,20 +574,11 @@
   };
 
   window.VD.flutterVariants = {
-    types: Object.keys(LIBRARY),
-    forType: function (type) { return LIBRARY[type] || []; },
-    get: function (type, id) {
-      return (LIBRARY[type] || []).filter(function (v) { return v.id === id; })[0] || null;
-    },
-    typeOf: function (c) {
-      if (!c) return null;
-      if (c.kind === 'button') return 'button';
-      if (c.kind === 'region') {
-        if (c.component === 'classic' || c.component === 'ir' || c.component === 'ig') return c.component;
-        return c.type === 'NATIVE_CARDS' ? 'cards' : c.type === 'NATIVE_JET_CHART' ? 'chart' : 'region';
-      }
-      return ITEM_TYPES[c.type] || null;
-    },
+    // The family ids, in the order they are listed.
+    get types() { return REG.families().map(function (f) { return f.id; }); },
+    forType: function (type) { var f = REG.family(type); return f ? f.variants : []; },
+    get: function (type, id) { return REG.variant(type, id); },
+    typeOf: function (c) { var f = REG.familyOf(c); return f ? f.id : null; },
     // Returns a safe value for the parameter kind, or null when the value is not allowed.
     cleanParam: function (param, value) {
       var s = String(value == null ? '' : value).trim();

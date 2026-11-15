@@ -9,7 +9,7 @@ const assert = require('assert');
 
 const window = {};
 const ctx = { window, JSON, URL };
-['look-selectors', 'flutter-variants', 'flutter-codegen', 'theme-codegen'].forEach((n) => {
+['look-selectors', 'component-registry', 'flutter-variants', 'flutter-codegen', 'theme-codegen'].forEach((n) => {
   const f = 'plugin/files/js/' + n + '.js';
   vm.runInNewContext(fs.readFileSync(f, 'utf8'), ctx, { filename: f });
 });

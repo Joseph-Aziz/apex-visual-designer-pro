@@ -3,11 +3,12 @@
    Everything the designer knows about a family lives in its one definition:
 
      { id, label, plural, category, members, variants,           required
-       match, settings, defaultVariant, surface, hides, themeMark, sample, requires }   optional
+       match, params, defaultVariant, editor, surface, hides, themeMark, sample, requires }   optional
 
    members: [{ kind: 'item' | 'button' | 'region', apexType, label, sample }]. A member with no
    apexType is a catch-all for its kind. match(component) is for families the type alone cannot tell.
-   variants: [{ id, label, css(selector, values), settings, needsJs, js, font }].
+   variants: [{ id, label, css(selector, values), params, needsJs, js, font }]. A family with an
+   editor of its own (charts) has no designs.
    To add a family, register it from a file of its own; to add a design to an existing family,
    call registerVariant. Neither needs a change in this file. */
 (function () {
@@ -38,7 +39,7 @@
   function checkVariant(what, v) {
     if (!v || !text(v.id) || !text(v.label)) fail(what, 'a design needs an id and a label');
     if (typeof v.css !== 'function') fail(what, 'design ' + v.id + ' needs a css(selector, values) function');
-    checkSettings(what + ', design ' + v.id, v.settings);
+    checkSettings(what + ', design ' + v.id, v.params);
   }
 
   function register(def) {
@@ -53,22 +54,22 @@
       if (!text(m.label)) fail(what, 'a member needs a label');
     });
     if (def.match && typeof def.match !== 'function') fail(what, 'match must be a function');
-    if (!def.variants || !def.variants.length) fail(what, 'at least one design is needed');
+    if (!def.variants || (!def.variants.length && !text(def.editor))) fail(what, 'at least one design is needed');
     var seen = {};
     def.variants.forEach(function (v) {
       checkVariant(what, v);
       if (seen[v.id]) fail(what, 'the design id ' + v.id + ' is used twice');
       seen[v.id] = true;
     });
-    checkSettings(what, def.settings);
+    checkSettings(what, def.params);
     if (def.defaultVariant && !seen[def.defaultVariant]) fail(what, 'the default design ' + def.defaultVariant + ' does not exist');
 
     var family = {};
     Object.keys(def).forEach(function (k) { family[k] = def[k]; });
     family.members = def.members.slice();
-    family.settings = (def.settings || []).slice();
+    family.params = (def.params || []).slice();
     family.variants = def.variants.map(function (v) { v.builtIn = true; return v; });
-    family.defaultVariant = def.defaultVariant || def.variants[0].id;
+    family.defaultVariant = def.defaultVariant || (def.variants[0] ? def.variants[0].id : null);
     list.push(family);
     return family;
   }

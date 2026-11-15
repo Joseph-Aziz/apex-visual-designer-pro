@@ -5,7 +5,7 @@ const assert = require('assert');
 
 const window = {};
 const ctx = { window, JSON };
-['plugin/files/js/look-selectors.js', 'plugin/files/js/flutter-variants.js'].forEach((f) =>
+['plugin/files/js/look-selectors.js', 'plugin/files/js/component-registry.js', 'plugin/files/js/flutter-variants.js'].forEach((f) =>
   vm.runInNewContext(fs.readFileSync(f, 'utf8'), ctx, { filename: f }));
 const F = window.VD.flutterVariants;
 assert.ok(F, 'VD.flutterVariants is undefined');
@@ -218,5 +218,35 @@ assert.ok(dd.includes('#e2e8f0') && dd.includes('border-radius:'), 'date dashboa
 ['region', 'button', 'cards', 'choice', 'date'].forEach((t) => assert.strictEqual(F.get(t, 'v7').font, 'cairo', t + ' dashboard font'));
 
 assert.strictEqual(F.get('region', 'v1').js, undefined, 'other looks have no js');
+
+// The library lives in the component registry; VD.flutterVariants reads from it.
+{
+  const R = window.VD.componentRegistry;
+  assert.strictEqual(Array.from(R.families().map((f) => f.id)).join(' '), Array.from(F.types).join(' '), 'one family per type, in the same order');
+  assert.strictEqual(Array.from(F.types).join(' '), 'text date select choice switch button display region classic ir ig cards chart');
+  F.types.forEach((t) => {
+    assert.strictEqual(F.forType(t).length, R.family(t).variants.length, t + ' designs');
+    F.forType(t).forEach((v) => assert.strictEqual(F.get(t, v.id), R.variant(t, v.id), t + ' ' + v.id));
+  });
+  const cat = {}; R.categories().forEach((c) => { cat[c.id] = Array.from(c.families.map((f) => f.id)).join(' '); });
+  assert.strictEqual(cat.form, 'text date select');
+  assert.strictEqual(cat.selection, 'choice switch');
+  assert.strictEqual(cat.action, 'button');
+  assert.strictEqual(cat.display, 'display');
+  assert.strictEqual(cat.region, 'region cards chart');
+  assert.strictEqual(cat.report, 'classic ir ig');
+  const members = (id) => Array.from(R.family(id).members.map((m) => m.label)).join(', ');
+  assert.strictEqual(members('text'), 'Text Field, Textarea, Number Field, Password');
+  assert.strictEqual(members('select'), 'Select List, Popup LOV, Combobox');
+  assert.strictEqual(members('choice'), 'Checkbox Group, Radio Group, Checkbox');
+  assert.strictEqual(R.family('chart').editor, 'chart', 'charts have their own designer and no designs');
+  assert.strictEqual(R.family('text').plural, 'Text fields');
+
+  // a design added from outside the library file shows up everywhere the library is read
+  const before = F.forType('display').length;
+  R.registerVariant('display', { id: 'x1', label: 'Extra', params: [], css: (sel) => 'body ' + sel + ' { color:red }' });
+  assert.strictEqual(F.forType('display').length, before + 1);
+  assert.strictEqual(F.get('display', 'x1').label, 'Extra');
+}
 
 console.log('flutter_variants_test: all passed');

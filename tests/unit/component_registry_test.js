@@ -20,7 +20,7 @@ assert.ok(R, 'VD.componentRegistry is undefined');
 assert.strictEqual(R.families().length, 0, 'starts empty');
 
 // register and read back
-R.register(family('alpha', { settings: [{ key: 'accent', label: 'Accent', kind: 'color', default: '#112233' }] }));
+R.register(family('alpha', { params: [{ key: 'accent', label: 'Accent', kind: 'color', default: '#112233' }] }));
 assert.deepStrictEqual(Array.from(R.families().map((f) => f.id)), ['alpha']);
 assert.strictEqual(R.family('alpha').label, 'Thing');
 assert.strictEqual(R.family('nope'), null);
@@ -43,13 +43,16 @@ refused(R, family('Bad Id'), 'id');
 refused(R, family('alpha', { category: 'toys' }), 'category');
 refused(R, family('alpha', { label: '' }), 'label');
 refused(R, family('alpha', { variants: [] }), 'design');
+R.register(family('own', { variants: [], editor: 'chart' }));
+assert.strictEqual(R.family('own').defaultVariant, null, 'a family with its own editor needs no design');
+R = load();
 refused(R, family('alpha', { variants: [variant('v1'), variant('v1')] }), 'v1');
 refused(R, family('alpha', { variants: [{ id: 'v1', label: 'x' }] }), 'css');
 refused(R, family('alpha', { members: [] }), 'member');
 refused(R, family('alpha', { members: [{ kind: 'page', label: 'x' }] }), 'kind');
-refused(R, family('alpha', { settings: [{ key: 'a', label: 'A', kind: 'rainbow', default: '' }] }), 'rainbow');
-refused(R, family('alpha', { settings: [{ key: 'a', label: 'A', kind: 'color' }] }), 'default');
-refused(R, family('alpha', { settings: [{ key: 'a', label: 'A', kind: 'select', default: '' }] }), 'options');
+refused(R, family('alpha', { params: [{ key: 'a', label: 'A', kind: 'rainbow', default: '' }] }), 'rainbow');
+refused(R, family('alpha', { params: [{ key: 'a', label: 'A', kind: 'color' }] }), 'default');
+refused(R, family('alpha', { params: [{ key: 'a', label: 'A', kind: 'select', default: '' }] }), 'options');
 refused(R, family('alpha', { defaultVariant: 'v9' }), 'v9');
 assert.strictEqual(R.families().length, 0, 'a refused family is not registered');
 R.register(family('alpha'));

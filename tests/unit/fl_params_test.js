@@ -5,7 +5,7 @@ const assert = require('assert');
 
 const window = {};
 const ctx = { window, JSON };
-['plugin/files/js/look-selectors.js', 'plugin/files/js/flutter-variants.js', 'plugin/files/js/fl-params.js'].forEach((f) =>
+['plugin/files/js/look-selectors.js', 'plugin/files/js/component-registry.js', 'plugin/files/js/flutter-variants.js', 'plugin/files/js/fl-params.js'].forEach((f) =>
   vm.runInNewContext(fs.readFileSync(f, 'utf8'), ctx, { filename: f }));
 const V = window.VD.flutterVariants, P = window.VD.flParams;
 assert.ok(P, 'VD.flParams is undefined');

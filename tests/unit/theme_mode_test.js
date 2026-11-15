@@ -5,7 +5,7 @@ const assert = require('assert');
 
 const window = {};
 const ctx = { window, JSON, document: { getElementById: () => null } };
-['plugin/files/js/look-selectors.js', 'plugin/files/js/flutter-variants.js', 'plugin/files/js/flutter-codegen.js', 'plugin/files/js/theme-codegen.js', 'plugin/files/js/fl-params.js', 'plugin/files/js/theme-mode.js'].forEach((f) =>
+['plugin/files/js/look-selectors.js', 'plugin/files/js/component-registry.js', 'plugin/files/js/flutter-variants.js', 'plugin/files/js/flutter-codegen.js', 'plugin/files/js/theme-codegen.js', 'plugin/files/js/fl-params.js', 'plugin/files/js/theme-mode.js'].forEach((f) =>
   vm.runInNewContext(fs.readFileSync(f, 'utf8'), ctx, { filename: f }));
 const M = window.VD.themeMode;
 assert.ok(M && M.helpers, 'VD.themeMode.helpers is undefined');
