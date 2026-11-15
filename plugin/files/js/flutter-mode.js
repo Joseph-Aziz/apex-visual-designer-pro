@@ -707,6 +707,8 @@
     var out = output();
     var cssCheck = G().merge(state.pageCss, out.css), jsCheck = G().merge(state.pageJs, out.js);
     if (cssCheck.error || jsCheck.error) { setMessage(cssCheck.error || jsCheck.error); return; }
+    var tooBig = G().sizeError(cssCheck.text, jsCheck.text);
+    if (tooBig) { setMessage(tooBig); return; }
     state.busy = true; renderTop();
     setMessage('Saving into page ' + state.page + '…');
     VD.repository.saveFlutter(state.app, state.page, state.token, VD.chartMigrate.strip(state.design), out.css, out.js)

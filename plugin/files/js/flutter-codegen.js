@@ -140,6 +140,18 @@
     return { css: (css ? BASE_CSS + css : '') + frames, js: css || applies ? js : url };
   }
 
+  // The page import takes at most 32,767 characters of page JavaScript (found in 1.3.0). Inline CSS
+  // is held to the same limit until a live instance shows otherwise (component studio spike 1).
+  var LIMIT = 32767;
+  function n(x) { return String(x).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  // '' when the merged page CSS and JavaScript fit the import, else a message with the sizes.
+  function sizeError(css, js) {
+    var over = [['CSS', (css || '').length], ['JavaScript', (js || '').length]].filter(function (x) { return x[1] > LIMIT; });
+    if (!over.length) return '';
+    return 'Not saved: the page ' + over.map(function (x) { return x[0] + ' would be ' + n(x[1]) + ' characters'; }).join(' and the ') +
+      ', and a page takes at most ' + n(LIMIT) + '. Design fewer components on this page, or move repeated designs into the theme as presets.';
+  }
+
   function count(text, s) { return text.split(s).length - 1; }
 
   function merge(existing, block) {
@@ -162,6 +174,6 @@
     return { text: text.slice(0, a) + text.slice(b) };
   }
 
-  window.VD.flutterCodegen = { generate: generate, echartsUrl: echartsUrl, needsChartRuntime: needsChartRuntime, selectorFor: selectorFor, merge: merge, START: START, END: END,
+  window.VD.flutterCodegen = { generate: generate, echartsUrl: echartsUrl, needsChartRuntime: needsChartRuntime, selectorFor: selectorFor, merge: merge, sizeError: sizeError, LIMIT: LIMIT, START: START, END: END,
     important: important, rippleJs: rippleJs, fontJs: fontJs, BASE_CSS: BASE_CSS };
 })();
