@@ -137,6 +137,55 @@
 
   // ------------------------------------------------------------ theme style picker
   // Named styles of the pushed theme for one component type: [{ name, cls }].
+  // Presets are the application's named theme styles (spec C.6). The gallery shows those of the
+  // family whose design still exists: [{ label, cls, variant, values }].
+  function presetsFor(theme, type) {
+    var t = theme && theme.types && theme.types[type];
+    return ((t && t.styles) || []).filter(function (s) { return V().get(type, s.variant); }).map(function (s) {
+      return { label: s.name, cls: s.cls, variant: s.variant, values: s.values || {} };
+    });
+  }
+  // A copy of theme with one more style of type: a free class name and a copy of values.
+  function addPreset(theme, type, name, variant, values) {
+    var H = window.VD.themeMode.helpers;
+    var t = H.addStyle(theme, type, name, H.suggestClass(theme, type, name), variant);
+    var list = t.types[type].styles;
+    list[list.length - 1].values = JSON.parse(JSON.stringify(values || {}));
+    return t;
+  }
+  // A copy of the design components with the preset's design and values on c, marked presetOf.
+  function copyPreset(components, c, preset) {
+    var list = withChoice(components, c, preset.variant, JSON.parse(JSON.stringify(preset.values || {})));
+    list.filter(function (x) { return x.key === c.key; })[0].presetOf = preset.cls;
+    return list;
+  }
+  function usePreset(c, i) {
+    var pr = presetsFor(state.theme, c.ftype)[i];
+    if (!pr) return;
+    remember();
+    state.design.components = copyPreset(state.design.components, c, pr);
+    render();
+  }
+  // Save as preset: the component's design becomes a named style of the theme, saved as a draft.
+  function savePreset(c) {
+    var ch = choice(c.key);
+    if (!ch || !ch.variant || state.busy) return;
+    var name = window.prompt('Name of the new preset (it is saved into the theme of app ' + state.app + ' as a draft):', V().get(c.ftype, ch.variant).label);
+    name = String(name || '').trim().slice(0, 40);
+    if (!name) return;
+    var t = addPreset(state.theme || { global: {}, types: {} }, c.ftype, name, ch.variant, ch.values);
+    var bad = VD.themeCodegen.validate(t);
+    if (bad && bad.length) { setMessage(bad[0]); return; }
+    var out = VD.themeCodegen.themeCss(t, { app: state.app, version: 'draft', date: new Date().toISOString().slice(0, 10) });
+    state.busy = true; renderTop(); setMessage('Saving preset ' + name + '…');
+    VD.repository.saveThemeDraft(state.app, t, out.css, out.js).then(function (r) {
+      state.busy = false; state.theme = t;
+      if (VD.themeMode.stale) VD.themeMode.stale();
+      setMessage('Preset ' + name + ' saved (theme draft version ' + r.versionId + '). Every page of app ' + state.app + ' can copy it now; push the theme to link it.');
+      render();
+    }).catch(function (e) { state.busy = false; setMessage(e.message); renderTop(); });
+  }
+
   function stylesFor(theme, type) {
     var t = theme && theme.types && theme.types[type];
     return ((t && t.styles) || []).map(function (s) { return { name: s.name, cls: s.cls }; });
@@ -176,7 +225,7 @@
     state.undo = VD.undoStack.create(100); state.lastField = null;
     setMessage('Loading page ' + app + ':' + page + '…');
     // The pushed theme feeds the Theme style picker; without one (or without access) there is no picker.
-    var theme = VD.repository.readTheme(app).then(function (t) { return t.pushed && t.pushed.theme; }, function () { return null; });
+    var theme = VD.repository.readTheme(app).then(function (t) { return t; }, function () { return null; });
     return Promise.all([VD.repository.listPageComponents(app, page), VD.repository.readFlutter(app, page), theme])
       .then(function (r) {
         state.components = flatten(r[0]);
@@ -190,7 +239,8 @@
         state.design = VD.chartMigrate.design(saved).design;
         state.undo = VD.undoStack.create(100);
         state.lastField = null;
-        state.pushedTheme = r[2] || null;
+        state.pushedTheme = (r[2] && r[2].pushed && r[2].pushed.theme) || null;
+        state.theme = (r[2] && r[2].theme && r[2].theme.types) ? r[2].theme : null;
         state.chartKey = null;
         setMessage('');
         render(true);
@@ -222,6 +272,8 @@
   // Pointing at or focusing a gallery card shows it on the real component; null shows the design
   // again. The design, undo and the saved state are untouched.
   function tryOn(c, card) {
+    var pr = card && card.preset != null && presetsFor(state.theme, c.ftype)[card.preset];
+    if (pr) { applyPreview(copyPreset(state.design.components, c, pr)); return; }
     if (!card || !card.variant) { applyPreview(); return; }
     applyPreview(withChoice(state.design.components, c, card.variant));
   }
@@ -579,7 +631,10 @@
       right.innerHTML = hasPage() ? '<p class="lk-hint">Select a component in the list or click it on the page.</p>' : '';
     } else {
       var ch = choice(c.key);
-      var t = VD.flParams.gallery(c.ftype, { current: ch && ch.variant, canReset: !!(ch && Object.keys(ch.values || {}).length) });
+      var presets = presetsFor(state.theme, c.ftype);
+      var pi = ch && ch.presetOf ? presets.map(function (x) { return x.cls; }).indexOf(ch.presetOf) : -1;
+      var t = VD.flParams.gallery(c.ftype, { current: ch && ch.variant, presets: presets, preset: pi >= 0 ? pi : null,
+        canReset: !!(ch && Object.keys(ch.values || {}).length), canSave: !!(ch && ch.variant) && !state.busy });
       thumbCss = t.css;
       var params = '';
       if (ch) {
@@ -596,6 +651,7 @@
       right.innerHTML = '<h3>' + esc(c.label) + '</h3>' + themeStyleHtml(c) + t.html + params;
       bindThemeStyle(right, c);
       VD.flParams.bindGallery(right, { pick: function (id) { setVariant(c.key, id); },
+        preset: function (i) { usePreset(c, i); }, save: function () { savePreset(c); },
         tryOn: function (card) { tryOn(c, card); }, reset: function () { resetValues(c.key); } });
       if (ch) {
         VD.flParams.bind(right, V().get(c.ftype, ch.variant), function (key, raw) { setValue(c.key, key, raw); },
@@ -701,6 +757,9 @@
 
   window.VD.flutterMode = {
     browserTiles: browserTiles,
+    presetsFor: presetsFor,
+    addPreset: addPreset,
+    copyPreset: copyPreset,
     withChoice: withChoice,
     memberComponents: memberComponents,
     WIDTHS: WIDTHS,

@@ -79,7 +79,8 @@
   var state = {
     app: null, theme: emptyTheme(), savedJson: '', pushed: null,
     type: null, index: -1, view: 'gallery', page: 1,
-    versions: null, message: '', busy: false, open: {}
+    versions: null, message: '', busy: false, open: {},
+    stale: false     // another view saved the theme; reload on entry
   };
 
   function esc(s) { return P().esc(s); }
@@ -405,9 +406,51 @@
       if (state.app == null && VD.config && VD.config.app) state.app = VD.config.app;
       if (state.app == null) { host.innerHTML = '<p class="lk-hint" style="padding:16px">Set a default target application on the Visual Designer region to use the Theme Designer.</p>'; return; }
       if (!host) return;
-      if (!host.querySelector('.th-preview')) { render(true); load(); } else render();
+      if (!host.querySelector('.th-preview')) { render(true); load(); return; }
+      // A preset saved in Design items is a newer theme draft: load it, unless that drops edits here.
+      if (state.stale) {
+        state.stale = false;
+        if (!dirty() || window.confirm('A preset was saved into this theme from Design items. Load the theme again? Your unsaved changes here are lost.')) { render(); load(); return; }
+      }
+      render();
     },
+    stale: function () { state.stale = true; },
     helpers: { emptyTheme: emptyTheme, addStyle: addStyle, removeStyle: removeStyle, setDefault: setDefault,
       setValue: setValue, setStyleField: setStyleField, suggestClass: suggestClass, sample: sample, groups: groups }
+  };
+
+  // ------------------------------------------------------------ Saved designs
+  // The application's presets (its named theme styles), by family in registry order.
+  function savedGroups(theme) {
+    if (!theme || !theme.types) return [];
+    return VD.componentRegistry.families().map(function (f) {
+      return { family: f, styles: styles(theme, f.id) };
+    }).filter(function (g) { return g.styles.length; });
+  }
+  function renderSaved(box, r) {
+    var theme = r && r.theme && r.theme.types ? r.theme : null;
+    var groups = savedGroups(theme);
+    box.innerHTML = '<div class="sv-page"><h2>Saved designs</h2>' +
+      '<p class="lk-hint">Presets of app ' + esc(state.app) + ': the named styles of its theme. Copy one onto a component in Design items, ' +
+      'or link it with Theme style once the theme is pushed. Edit or remove them in the Theme Designer.</p>' +
+      (groups.length ? groups.map(function (g) {
+        return '<h3>' + esc(g.family.plural) + '</h3><ul class="sv-list">' + g.styles.map(function (st) {
+          var v = V().get(g.family.id, st.variant);
+          return '<li><b>' + esc(st.name) + '</b><span>' + esc(v ? v.label : 'unknown design ' + st.variant) +
+            ' · vd-' + esc(g.family.id) + '-' + esc(st.cls) + (st.isDefault ? ' · default' : '') + '</span></li>';
+        }).join('') + '</ul>';
+      }).join('') : '<p class="lk-hint">No presets yet. Use "Save as preset" in Design items.</p>') + '</div>';
+  }
+  VD.savedDesigns = {
+    groups: savedGroups,
+    enter: function () {
+      var box = document.getElementById('saved-host');
+      if (!box) return;
+      if (state.app == null && VD.config && VD.config.app) state.app = VD.config.app;
+      if (state.app == null) { box.innerHTML = '<p class="lk-hint" style="padding:16px">Set a default target application on the Visual Designer region to see its saved designs.</p>'; return; }
+      box.innerHTML = '<p class="lk-hint" style="padding:16px">Loading the saved designs…</p>';
+      VD.repository.readTheme(state.app).then(function (r) { renderSaved(box, r); },
+        function (e) { box.innerHTML = '<p class="lk-hint" style="padding:16px">' + esc(e.message) + '</p>'; });
+    }
   };
 })();

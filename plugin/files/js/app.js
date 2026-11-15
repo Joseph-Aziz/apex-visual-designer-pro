@@ -11,7 +11,8 @@
   var VIEWS = {
     flutter: function () { return VD.flutterMode; },
     theme: function () { return VD.themeMode; },
-    layout: function () { return VD.layoutMode; }
+    layout: function () { return VD.layoutMode; },
+    saved: function () { return VD.savedDesigns; }
   };
   var DEFAULT_VIEW = 'flutter';
   // Views that work on one page; the shared page bar shows only on these.
