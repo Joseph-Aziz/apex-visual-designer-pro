@@ -25,14 +25,45 @@
     usePage: false,      // true: clicks in the preview reach the page (fill items, submit) instead of selecting
     undo: null,          // undo/redo snapshots of the design (spec §7), one stack per open page
     lastField: null,     // the field typed in last, so a run of keystrokes is one undo step
-    sectionsOpen: {},    // which closed-by-default panel sections the owner opened
     sectionsOpen: {},    // the panel sections the owner opened, by section id
+    leftView: 'page',    // the left panel: 'page' (components on this page) or 'all' (every family)
+    search: '',          // the filter of the All components view
+    browse: null,        // { family, member } chosen in All components; not part of the design
+    width: 'desktop',    // the preview width: desktop, tablet or mobile
     chartKey: null,      // the chart whose Chart Designer panel is open
     chartView: { node: 'chart', tab: 'all', level: 'basic', width: 'desktop', point: '' },
     chartRuntime: null   // text of the chart runtime for the live preview, loaded on demand
   };
   var CHART_FILES = ['chart-schema', 'chart-jet', 'chart-echarts', 'chart-runtime'];
   var CD = function () { return VD.chartDesigner; };
+  var WIDTHS = { desktop: '', tablet: '768px', mobile: '375px' };
+
+  // The page components that are one member of a family: those whose type the member names,
+  // or, for the member with no type (or the only member), those no other member names.
+  function memberComponents(family, member, components) {
+    var named = function (c) { return family.members.some(function (m) { return m.apexType && m.kind === c.kind && m.apexType === c.type; }); };
+    var fallback = !member.apexType || family.members.length === 1;
+    return components.filter(function (c) {
+      if (c.ftype !== family.id || c.kind !== member.kind) return false;
+      return member.apexType && member.apexType === c.type ? true : fallback && !named(c);
+    });
+  }
+  // The All components view: [{ id, label, tiles: [{ family, member, count }] }], filtered by query
+  // on the member, family and category labels. Categories with no tile left are dropped.
+  function browserTiles(categories, components, query) {
+    var q = String(query || '').trim().toLowerCase();
+    return categories.map(function (cat) {
+      var tiles = [];
+      cat.families.forEach(function (f) {
+        f.members.forEach(function (m) {
+          var text = (m.label + ' ' + f.label + ' ' + f.plural + ' ' + cat.label).toLowerCase();
+          if (q && text.indexOf(q) < 0) return;
+          tiles.push({ family: f, member: m, count: memberComponents(f, m, components).length });
+        });
+      });
+      return { id: cat.id, label: cat.label, tiles: tiles };
+    }).filter(function (g) { return g.tiles.length; });
+  }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -306,6 +337,9 @@
       '<strong class="fl-title">Design items</strong>' +
       '<span class="lk-state">' + (hasPage() ? (dirty() ? 'Unsaved changes' : 'Saved') : '') + '</span>' +
       '<span class="lk-spacer"></span>' +
+      '<span class="fl-widths" role="group" aria-label="Preview width">' + ['desktop', 'tablet', 'mobile'].map(function (w) {
+        return '<button class="vd-btn vd-btn--ghost" data-width="' + w + '" aria-pressed="' + (state.width === w) + '">' + w.charAt(0).toUpperCase() + w.slice(1) + '</button>';
+      }).join('') + '</span>' +
       '<button class="vd-btn vd-btn--ghost fl-undo" title="Undo (Ctrl+Z)"' + (state.undo && state.undo.canUndo() ? '' : ' disabled') + '>Undo</button>' +
       '<button class="vd-btn vd-btn--ghost fl-redo" title="Redo (Ctrl+Y)"' + (state.undo && state.undo.canRedo() ? '' : ' disabled') + '>Redo</button>' +
       '<button class="vd-btn vd-btn--ghost fl-use-page" aria-pressed="' + state.usePage + '" title="Use the page in the preview: fill items and submit, for example to show a chart that needs dates. Turn off to select components again.">' +
@@ -317,6 +351,14 @@
     top.querySelector('.fl-redo').addEventListener('click', function () { step(true); });
     top.querySelector('.fl-use-page').addEventListener('click', function () { state.usePage = !state.usePage; render(); });
     top.querySelector('.fl-save').addEventListener('click', function () { save(); });
+    top.querySelectorAll('[data-width]').forEach(function (b) {
+      b.addEventListener('click', function () { state.width = b.getAttribute('data-width'); renderTop(); setWidth(); });
+    });
+  }
+  // The preview width from the switch; an open Chart Designer sets its own.
+  function setWidth() {
+    var f = host.querySelector('.fl-preview');
+    if (f && !state.chartKey) f.style.width = WIDTHS[state.width] || '';
   }
 
   // The list heading for a family, or for the components no family takes.
@@ -325,14 +367,14 @@
     return f ? f.plural : 'Not supported';
   }
 
-  function renderLeft() {
+  function pageListHtml() {
     var groups = {};
     state.components.forEach(function (c) {
       var g = c.ftype || 'other';
       (groups[g] = groups[g] || []).push(c);
     });
     var order = V().types.concat(['other']);
-    var html = hasPage() ? order.filter(function (g) { return groups[g]; }).map(function (g) {
+    return hasPage() ? order.filter(function (g) { return groups[g]; }).map(function (g) {
       return '<h3>' + esc(heading(g)) + '</h3>' + groups[g].map(function (c) {
         var blocked = !c.ftype ? 'type not supported' : '';
         var ch = choice(c.key);
@@ -341,11 +383,56 @@
           esc(blocked || (c.needsStaticId ? 'set Static ID first' : ch && ch.chart ? 'Chart Designer' : ch ? V().get(c.ftype, ch.variant).label : 'plain')) + '</span></button>';
       }).join('');
     }).join('') : '<p class="lk-hint">Open a page in the page bar above.</p>';
+  }
+  function tilesHtml() {
+    var groups = browserTiles(window.VD.componentRegistry.categories(), state.components, state.search);
+    if (!groups.length) return '<p class="lk-hint">No component matches.</p>';
+    var b = state.browse;
+    return groups.map(function (g) {
+      return '<h3>' + esc(g.label) + '</h3><div class="fl-tiles">' + g.tiles.map(function (t) {
+        var on = b && b.family === t.family.id && b.member === t.member.label;
+        return '<button class="fl-tile' + (on ? ' is-selected' : '') + (t.count ? '' : ' is-absent') + '" data-family="' + esc(t.family.id) +
+          '" data-member="' + esc(t.member.label) + '"><b>' + esc(t.member.label) + '</b><span>' +
+          (t.count ? t.count + ' on this page' : 'none on this page') + '</span></button>';
+      }).join('') + '</div>';
+    }).join('');
+  }
+  function bindTiles(box) {
+    box.querySelectorAll('[data-family]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.browse = { family: b.getAttribute('data-family'), member: b.getAttribute('data-member') };
+        renderLeft(); renderRight();
+      });
+    });
+  }
+
+  function renderLeft() {
+    var all = state.leftView === 'all';
     var left = host.querySelector('.fl-left');
-    left.innerHTML = html;
+    left.innerHTML = '<div class="fl-left-views" role="tablist">' +
+      '<button class="vd-btn vd-btn--ghost" data-view="page" aria-pressed="' + !all + '">On this page</button>' +
+      '<button class="vd-btn vd-btn--ghost" data-view="all" aria-pressed="' + all + '">All components</button></div>' +
+      (all ? '<input type="search" class="fl-search" placeholder="Search components" aria-label="Search components" value="' + esc(state.search) + '">' +
+        '<div class="fl-tile-list">' + tilesHtml() + '</div>' : pageListHtml());
+    left.querySelectorAll('[data-view]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.leftView = b.getAttribute('data-view');
+        if (state.leftView === 'page') state.browse = null;
+        renderLeft(); renderRight();
+      });
+    });
     left.querySelectorAll('[data-key]').forEach(function (b) {
       b.addEventListener('click', function () { state.selected = b.getAttribute('data-key'); render(); });
     });
+    var box = left.querySelector('.fl-tile-list');
+    if (box) {
+      bindTiles(box);
+      // Only the tiles redraw while typing, so the search box keeps its focus.
+      left.querySelector('.fl-search').addEventListener('input', function (e) {
+        state.search = e.target.value;
+        box.innerHTML = tilesHtml(); bindTiles(box);
+      });
+    }
   }
 
   // ------------------------------------------------------------ static id
@@ -414,7 +501,6 @@
   }
   function closeChart() {
     state.chartKey = null;
-    var f = host.querySelector('.fl-preview'); if (f) f.style.width = '';
     render();
   }
   function renderChartPanel(right, c) {
@@ -464,7 +550,8 @@
     var thumbCss = '';
     var chartOpen = !!(c && state.chartKey === c.key && choice(c.key) && choice(c.key).chart);
     host.classList.toggle('fl-chart-open', chartOpen);
-    if (!chartOpen) { state.chartKey = null; host.querySelector('.fl-preview').style.width = ''; }
+    if (!chartOpen) { state.chartKey = null; setWidth(); }
+    if (state.leftView === 'all' && state.browse) { renderBrowse(right); return; }
     if (chartOpen) { renderChartPanel(right, c); host.querySelector('#fl-thumbs-css').textContent = ''; return; }
     if (c && c.ftype === 'chart' && !c.needsStaticId) {
       var cch = choice(c.key);
@@ -506,6 +593,28 @@
       if (rm) rm.addEventListener('click', function () { setVariant(c.key, null); });
     }
     host.querySelector('#fl-thumbs-css').textContent = thumbCss;
+  }
+  // A member chosen in All components: its designs, and the page components it can apply to.
+  // With none on the page the designs can be looked at but not applied.
+  function renderBrowse(right) {
+    var f = window.VD.componentRegistry.family(state.browse.family);
+    var m = f && f.members.filter(function (x) { return x.label === state.browse.member; })[0];
+    if (!m) { state.browse = null; renderRight(); return; }
+    var mine = memberComponents(f, m, state.components);
+    var t = f.editor === 'chart' ? { html: '<p class="lk-hint">Charts are styled with the Chart Designer.</p>', css: '' } : VD.flParams.gallery(f.id, {});
+    right.innerHTML = '<h3>' + esc(m.label) + '</h3>' +
+      (mine.length ? '<p class="lk-hint">Choose a component to design it:</p>' + mine.map(function (c) {
+        return '<button class="lk-slot" data-key="' + esc(c.key) + '"><b>' + esc(c.label) + '</b></button>';
+      }).join('') : '<p class="lk-hint fl-browse-only">This page has no ' + esc(m.label) + '. The designs below are for browsing only.</p>') +
+      '<div class="fl-browse-gallery">' + t.html + '</div>';
+    right.querySelectorAll('[data-key]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.selected = b.getAttribute('data-key'); state.leftView = 'page'; state.browse = null; render();
+      });
+    });
+    // Browse only: the gallery's cards do nothing here.
+    right.querySelectorAll('.fl-browse-gallery button').forEach(function (b) { b.disabled = true; });
+    host.querySelector('#fl-thumbs-css').textContent = t.css;
   }
   // The strip under the preview: the selected component and its design.
   function renderStatus() {
@@ -579,6 +688,9 @@
   });
 
   window.VD.flutterMode = {
+    browserTiles: browserTiles,
+    memberComponents: memberComponents,
+    WIDTHS: WIDTHS,
     enter: function () {
       host = document.getElementById('flutter-host');
       if (!host) return;
