@@ -308,17 +308,21 @@
     top.querySelector('.fl-save').addEventListener('click', function () { save(); });
   }
 
+  // The list heading for a family, or for the components no family takes.
+  function heading(type) {
+    var f = window.VD.componentRegistry.family(type);
+    return f ? f.plural : 'Not supported';
+  }
+
   function renderLeft() {
     var groups = {};
     state.components.forEach(function (c) {
       var g = c.ftype || 'other';
       (groups[g] = groups[g] || []).push(c);
     });
-    var names = { text: 'Text fields', date: 'Date pickers', select: 'Lists', choice: 'Checkboxes and radios', 'switch': 'Switches',
-      button: 'Buttons', display: 'Display only', region: 'Regions', classic: 'Classic reports', ir: 'Interactive reports', ig: 'Interactive grids', cards: 'Cards', chart: 'Charts', other: 'Not supported' };
     var order = V().types.concat(['other']);
     var html = hasPage() ? order.filter(function (g) { return groups[g]; }).map(function (g) {
-      return '<h3>' + names[g] + '</h3>' + groups[g].map(function (c) {
+      return '<h3>' + esc(heading(g)) + '</h3>' + groups[g].map(function (c) {
         var blocked = !c.ftype ? 'type not supported' : '';
         var ch = choice(c.key);
         return '<button class="lk-slot' + (state.selected === c.key ? ' is-selected' : '') + '" data-key="' + esc(c.key) + '"' +
@@ -582,6 +586,7 @@
     },
     attach: attach,
     stylesFor: stylesFor,
+    heading: heading,
     currentStyle: currentStyle
   };
 })();

@@ -10,33 +10,19 @@
     });
   }
 
-  var SAMPLES = {
-    field: '<div class="t-Form-fieldContainer"><div class="t-Form-labelContainer"><label class="t-Form-label">Label</label></div>' +
-      '<div class="t-Form-inputContainer"><input class="text_field apex-item-text" value="Text"></div></div>',
-    choice: '<div class="apex-item-group"><div class="apex-item-option"><input type="radio" checked id="§a"><label for="§a">One</label></div>' +
-      '<div class="apex-item-option"><input type="radio" id="§b"><label for="§b">Two</label></div></div>',
-    'switch': '<span class="a-Switch"><input type="checkbox" checked><span class="a-Switch-toggle"></span></span>',
-    button: '<button type="button" class="t-Button">Button</button>',
-    display: '<span class="display_only">Value</span>',
-    region: '<div class="t-Region"><div class="t-Region-header"><h2 class="t-Region-title">Title</h2></div><div class="t-Region-body">Body</div></div>',
-    classic: '<table class="t-Report-report"><thead><tr><th>Name</th><th>Date</th></tr></thead><tr><td>One</td><td>1</td></tr><tr><td>Two</td><td>2</td></tr></table>',
-    ir: '<table class="a-IRR-table"><tr><th class="a-IRR-header">Name</th><th class="a-IRR-header">Date</th></tr><tr><td>One</td><td>1</td></tr><tr><td>Two</td><td>2</td></tr></table>',
-    ig: '<div class="a-GV"><table><tr class="a-GV-header"><th>Name</th><th>Date</th></tr><tr class="a-GV-row"><td>One</td><td>1</td></tr><tr class="a-GV-row"><td>Two</td><td>2</td></tr></table></div>',
-    cards: '<div class="a-CardView"><div class="a-CardView-media"></div><div class="a-CardView-body"><div class="a-CardView-title">Card</div></div></div>'
-  };
+  // The family's thumbnail markup, with {id} left in for the thumbnail's own id.
   function sample(type) {
-    return SAMPLES[type] || (type === 'text' || type === 'date' || type === 'select' ? SAMPLES.field : '');
+    var f = window.VD.componentRegistry.family(type);
+    return (f && f.sample) || '';
   }
   // Six design thumbnails for a type; css styles them, each scoped to its own id.
   function thumbnails(type, current) {
     var css = '';
     var html = V().forType(type).map(function (v) {
       var id = 'fl-thumb-' + v.id;
-      // Region, button and cards variants style the element that carries the id.
-      var inner = sample(type).replace(/§/g, id + '-');
-      var wrapped = type === 'button' ? inner.replace('<button ', '<button id="' + id + '" ')
-        : type === 'region' ? inner.replace('<div class="t-Region"', '<div class="t-Region" id="' + id + '"')
-        : '<div id="' + id + '">' + inner + '</div>';
+      // Markup that carries id="{id}" is the element the design styles; anything else is wrapped.
+      var inner = sample(type).replace(/\{id\}/g, id);
+      var wrapped = sample(type).indexOf('id="{id}"') >= 0 ? inner : '<div id="' + id + '">' + inner + '</div>';
       css += v.css('#' + id, V().values(v, {}));
       return '<button class="fl-variant' + (current === v.id ? ' is-selected' : '') + '" data-variant="' + v.id + '">' +
         '<span class="fl-thumb">' + wrapped + '</span><b>' + esc(v.label) + '</b></button>';

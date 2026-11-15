@@ -8,41 +8,32 @@
   var V = window.VD.flutterVariants, G = window.VD.flutterCodegen;
 
   var CLASS_NAME = /^[a-z][a-z0-9-]{0,30}$/;
-  var REGION_TYPES = { region: 1, cards: 1, classic: 1, ir: 1, ig: 1 };
-  // What tells one region type from another in the page markup.
-  var REGION_MARK = {
-    cards: ':has(.a-CardView)', ir: ':has(.a-IRR)', ig: ':has(.a-IG)', classic: ':has(.t-Report)',
-    region: ':not(:has(.a-CardView, .a-IRR, .a-IG, .t-Report))'
-  };
-  // What tells one item type from another inside its field container.
-  var ITEM_MARK = {
-    text: ':has(input.text_field, textarea)',
-    date: ':has(.apex-item-datepicker, .a-DatePicker)',
-    select: ':has(select, .apex-item-popup-lov, .a-Combobox)',
-    choice: ':has(.apex-item-checkbox, .apex-item-radio)',
-    'switch': ':has(.a-Switch)',
-    display: ':has(.display_only)'
-  };
-  var NAMES = { region: 'Regions', cards: 'Cards', classic: 'Classic reports', ir: 'Interactive reports', ig: 'Interactive grids',
-    text: 'Text fields', date: 'Date pickers', select: 'Lists', choice: 'Checkboxes and radios', 'switch': 'Switches',
-    display: 'Display only', button: 'Buttons' };
+  var R = window.VD.componentRegistry;
+  // The families a theme can style: those with designs of their own.
+  function themeable(type) { var f = R.family(type); return f && f.variants.length ? f : null; }
+  // Plural names of the families a theme can style, for headings and messages.
+  function names() {
+    var out = {};
+    R.families().forEach(function (f) { if (f.variants.length) out[f.id] = f.plural; });
+    return out;
+  }
 
   // The element a style applies to: with a class name, the components that carry vd-<type>-<cls>;
   // without one (cls null), the components of that type that carry no vd-<type>-* class.
   function selectors(type, cls) {
-    var prefix = 'vd-' + type + '-';
+    var prefix = 'vd-' + type + '-', f = R.family(type);
     // The default button style leaves the app's own header and navigation buttons alone.
-    if (type === 'button') {
+    if (f.surface === 'button') {
       return cls ? '.t-Button.' + prefix + cls : '.t-Button:not([class*="' + prefix + '"]):not(.t-Header .t-Button, .t-Body-nav .t-Button)';
     }
-    if (REGION_TYPES[type]) {
-      // Interactive reports and grids use the t-IRR-region wrapper in Universal Theme.
-      var wrap = type === 'ir' || type === 'ig' ? ':is(.t-Region, .t-IRR-region)' : '.t-Region';
-      return cls ? wrap + '.' + prefix + cls : wrap + ':not([class*="' + prefix + '"])' + REGION_MARK[type];
+    if (f.surface === 'region') {
+      // themeWrap: interactive reports and grids use the t-IRR-region wrapper in Universal Theme.
+      var wrap = f.themeWrap || '.t-Region';
+      return cls ? wrap + '.' + prefix + cls : wrap + ':not([class*="' + prefix + '"])' + (f.themeMark || '');
     }
     // APEX puts an item's CSS classes on the input, so the style targets the container holding it.
     return cls ? '.t-Form-fieldContainer:has(.' + prefix + cls + ')'
-      : '.t-Form-fieldContainer:not(:has([class*="' + prefix + '"]))' + ITEM_MARK[type];
+      : '.t-Form-fieldContainer:not(:has([class*="' + prefix + '"]))' + (f.themeMark || '');
   }
 
   function stylesOf(theme) {
@@ -56,17 +47,17 @@
   function validate(theme) {
     var msgs = [];
     Object.keys((theme && theme.types) || {}).forEach(function (type) {
-      if (!NAMES[type]) { msgs.push('Unknown component type ' + type + '.'); return; }
+      if (!themeable(type)) { msgs.push('Unknown component type ' + type + '.'); return; }
       var seen = {}, defaults = 0;
       ((theme.types[type] || {}).styles || []).forEach(function (s) {
         var name = s.name || s.cls || '(no name)';
         if (!CLASS_NAME.test(s.cls || '')) msgs.push('Class name for ' + name + ' must start with a letter and use only a-z, 0-9 and - (at most 31).');
-        else if (seen[s.cls]) msgs.push(NAMES[type] + ' already have a style with class vd-' + type + '-' + s.cls + '.');
+        else if (seen[s.cls]) msgs.push(names()[type] + ' already have a style with class vd-' + type + '-' + s.cls + '.');
         seen[s.cls] = true;
         if (!V.get(type, s.variant)) msgs.push('Pick a design for ' + name + '.');
         if (s.isDefault) defaults += 1;
       });
-      if (defaults > 1) msgs.push(NAMES[type] + ' can have only one default style.');
+      if (defaults > 1) msgs.push(names()[type] + ' can have only one default style.');
     });
     return msgs;
   }
@@ -121,5 +112,5 @@
     };
   }
 
-  window.VD.themeCodegen = { validate: validate, selectors: selectors, themeCss: themeCss, names: NAMES, CLASS_NAME: CLASS_NAME };
+  window.VD.themeCodegen = { validate: validate, selectors: selectors, themeCss: themeCss, get names() { return names(); }, CLASS_NAME: CLASS_NAME };
 })();

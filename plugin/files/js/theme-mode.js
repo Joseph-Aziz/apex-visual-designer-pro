@@ -67,11 +67,14 @@
   }
 
   // ------------------------------------------------------------ view state
-  var GROUPS = [
-    ['Regions', ['region', 'cards', 'classic', 'ir', 'ig']],
-    ['Items', ['text', 'date', 'select', 'choice', 'switch', 'display']],
-    ['Buttons', ['button']]
-  ];
+  // The type list: the families a theme can style, grouped by the markup they style.
+  var SURFACES = [['region', 'Regions'], ['item', 'Items'], ['button', 'Buttons']];
+  function groups() {
+    var R = window.VD.componentRegistry;
+    return SURFACES.map(function (sf) {
+      return [sf[1], R.families().filter(function (f) { return f.surface === sf[0] && f.variants.length; }).map(function (f) { return f.id; })];
+    }).filter(function (g) { return g[1].length; });
+  }
   var host = null, frame = null;
   var state = {
     app: null, theme: emptyTheme(), savedJson: '', pushed: null,
@@ -91,31 +94,18 @@
   // ------------------------------------------------------------ gallery samples
   // Real Universal Theme markup for one type, carrying the style's class where APEX puts it.
   function sample(type, cls) {
-    var c = cls ? ' vd-' + type + '-' + cls : '';
-    var inner = {
-      region: 'Body text', cards: '<div class="a-CardView-items">' + P().sample('cards') + '</div>',
-      classic: '<div class="t-Report">' + P().sample('classic') + '</div>',
-      ir: '<div class="a-IRR"><div class="a-IRR-toolbar"><span class="a-IRR-search">Search</span> <span class="a-IRR-actions">Actions</span></div>' + P().sample('ir') + '</div>',
-      ig: '<div class="a-IG"><div class="a-IG-header">Toolbar</div>' + P().sample('ig') + '</div>'
-    };
-    if (inner[type] != null) {
-      return '<div class="t-Region' + c + '"><div class="t-Region-header"><h2 class="t-Region-title">Title</h2></div><div class="t-Region-body">' + inner[type] + '</div></div>';
+    var f = window.VD.componentRegistry.family(type);
+    var inner = ((f && f.themeSample) || '').replace(/\{cls\}/g, cls ? ' vd-' + type + '-' + cls : '');
+    if (f && f.surface === 'region') {
+      return '<div class="t-Region' + (cls ? ' vd-' + type + '-' + cls : '') + '"><div class="t-Region-header"><h2 class="t-Region-title">Title</h2></div><div class="t-Region-body">' + inner + '</div></div>';
     }
-    if (type === 'button') return '<button type="button" class="t-Button' + c + '"><span class="t-Button-label">Button</span></button>';
-    var field = {
-      text: '<input class="text_field apex-item-text' + c + '" value="Text">',
-      date: '<span class="apex-item-datepicker"><input class="text_field apex-item-text' + c + '" value="2026-11-11"></span>',
-      select: '<select class="selectlist apex-item-select' + c + '"><option>One</option></select>',
-      choice: '<div class="apex-item-radio' + c + '"><div class="apex-item-option"><input type="radio" checked><label>One</label></div><div class="apex-item-option"><input type="radio"><label>Two</label></div></div>',
-      'switch': '<span class="a-Switch' + c + '"><input type="checkbox" checked><span class="a-Switch-toggle"></span></span>',
-      display: '<span class="display_only' + c + '">Value</span>'
-    }[type];
+    if (f && f.surface === 'button') return inner;
     return '<div class="t-Form-fieldContainer"><div class="t-Form-labelContainer"><label class="t-Form-label">Label</label></div>' +
-      '<div class="t-Form-inputContainer">' + field + '</div></div>';
+      '<div class="t-Form-inputContainer">' + inner + '</div></div>';
   }
 
   function galleryHtml() {
-    var types = state.type ? [state.type] : GROUPS.reduce(function (a, g) { return a.concat(g[1]); }, []).filter(function (t) { return styles(state.theme, t).length; });
+    var types = state.type ? [state.type] : groups().reduce(function (a, g) { return a.concat(g[1]); }, []).filter(function (t) { return styles(state.theme, t).length; });
     if (!types.length) return '<div class="lk-empty">Add a style to a component type on the left.</div>';
     return types.map(function (type) {
       var list = styles(state.theme, type);
@@ -287,7 +277,7 @@
   function renderLeft() {
     var left = host.querySelector('.th-left');
     left.innerHTML = '<button class="lk-slot' + (state.type === null ? ' is-selected' : '') + '" data-global="1"><b>Global</b><span>Page background, font, accent</span></button>' +
-      GROUPS.map(function (g) {
+      groups().map(function (g) {
         return '<h3>' + g[0] + '</h3>' + g[1].map(function (type) {
           var list = styles(state.theme, type);
           return '<div class="th-type"><div class="th-type-head"><b>' + esc(T().names[type]) + '</b><button class="th-add" data-add="' + type + '" title="Add a style">+ Style</button></div>' +
@@ -408,6 +398,6 @@
       if (!host.querySelector('.th-preview')) { render(true); load(); } else render();
     },
     helpers: { emptyTheme: emptyTheme, addStyle: addStyle, removeStyle: removeStyle, setDefault: setDefault,
-      setValue: setValue, setStyleField: setStyleField, suggestClass: suggestClass, sample: sample }
+      setValue: setValue, setStyleField: setStyleField, suggestClass: suggestClass, sample: sample, groups: groups }
   };
 })();

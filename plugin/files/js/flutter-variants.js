@@ -540,29 +540,67 @@
   // components belong to it. The family id is stored in saved designs and themes; never rename one.
   function items(list) { return list.map(function (m) { return { kind: 'item', apexType: m[0], label: m[1] }; }); }
   function reportOf(component) { return function (c) { return c.kind === 'region' && c.component === component; }; }
+  // Sample markup. A design thumbnail replaces {id} with its own id; markup without id="{id}" is
+  // wrapped in an element that carries the id. A theme sample replaces {cls} with the style class.
+  // themeMark tells the family apart from the others of its surface in the page markup.
+  var FIELD = '<div class="t-Form-fieldContainer"><div class="t-Form-labelContainer"><label class="t-Form-label">Label</label></div>' +
+    '<div class="t-Form-inputContainer"><input class="text_field apex-item-text" value="Text"></div></div>';
+  var TABLE = {
+    classic: '<table class="t-Report-report"><thead><tr><th>Name</th><th>Date</th></tr></thead><tr><td>One</td><td>1</td></tr><tr><td>Two</td><td>2</td></tr></table>',
+    ir: '<table class="a-IRR-table"><tr><th class="a-IRR-header">Name</th><th class="a-IRR-header">Date</th></tr><tr><td>One</td><td>1</td></tr><tr><td>Two</td><td>2</td></tr></table>',
+    ig: '<div class="a-GV"><table><tr class="a-GV-header"><th>Name</th><th>Date</th></tr><tr class="a-GV-row"><td>One</td><td>1</td></tr><tr class="a-GV-row"><td>Two</td><td>2</td></tr></table></div>',
+    cards: '<div class="a-CardView"><div class="a-CardView-media"></div><div class="a-CardView-body"><div class="a-CardView-title">Card</div></div></div>'
+  };
+  var IRR_WRAP = ':is(.t-Region, .t-IRR-region)';
+
   var FAMILIES = [
-    { id: 'text', label: 'Text field', plural: 'Text fields', category: 'form',
-      members: items([['NATIVE_TEXT_FIELD', 'Text Field'], ['NATIVE_TEXTAREA', 'Textarea'], ['NATIVE_NUMBER_FIELD', 'Number Field'], ['NATIVE_PASSWORD', 'Password']]) },
-    { id: 'date', label: 'Date picker', plural: 'Date pickers', category: 'form',
-      members: items([['NATIVE_DATE_PICKER_APEX', 'Date Picker'], ['NATIVE_DATEPICKER_APEX', 'Date Picker'], ['NATIVE_DATE_PICKER', 'Date Picker']]) },
-    { id: 'select', label: 'List', plural: 'Lists', category: 'form',
-      members: items([['NATIVE_SELECT_LIST', 'Select List'], ['NATIVE_POPUP_LOV', 'Popup LOV'], ['NATIVE_COMBOBOX', 'Combobox']]) },
-    { id: 'choice', label: 'Checkbox or radio', plural: 'Checkboxes and radios', category: 'selection',
-      members: items([['NATIVE_CHECKBOX', 'Checkbox Group'], ['NATIVE_RADIOGROUP', 'Radio Group'], ['NATIVE_SINGLE_CHECKBOX', 'Checkbox']]) },
-    { id: 'switch', label: 'Switch', plural: 'Switches', category: 'selection', members: items([['NATIVE_YES_NO', 'Switch']]) },
-    { id: 'button', label: 'Button', plural: 'Buttons', category: 'action', members: [{ kind: 'button', label: 'Button' }] },
-    { id: 'display', label: 'Display only', plural: 'Display only', category: 'display', members: items([['NATIVE_DISPLAY_ONLY', 'Display Only']]) },
-    { id: 'region', label: 'Region', plural: 'Regions', category: 'region',
-      members: [{ kind: 'region', label: 'Standard Region' }, { kind: 'region', apexType: 'NATIVE_STATIC', label: 'Static Content' }] },
-    { id: 'classic', label: 'Classic report', plural: 'Classic reports', category: 'report',
-      members: [{ kind: 'region', apexType: 'NATIVE_SQL_REPORT', label: 'Classic Report' }], match: reportOf('classic') },
-    { id: 'ir', label: 'Interactive report', plural: 'Interactive reports', category: 'report',
-      members: [{ kind: 'region', apexType: 'NATIVE_IR', label: 'Interactive Report' }], match: reportOf('ir') },
-    { id: 'ig', label: 'Interactive grid', plural: 'Interactive grids', category: 'report',
-      members: [{ kind: 'region', apexType: 'NATIVE_IG', label: 'Interactive Grid' }], match: reportOf('ig') },
-    { id: 'cards', label: 'Cards', plural: 'Cards', category: 'region', members: [{ kind: 'region', apexType: 'NATIVE_CARDS', label: 'Cards' }] },
+    { id: 'text', label: 'Text field', plural: 'Text fields', category: 'form', surface: 'item',
+      members: items([['NATIVE_TEXT_FIELD', 'Text Field'], ['NATIVE_TEXTAREA', 'Textarea'], ['NATIVE_NUMBER_FIELD', 'Number Field'], ['NATIVE_PASSWORD', 'Password']]),
+      sample: FIELD, themeMark: ':has(input.text_field, textarea)',
+      themeSample: '<input class="text_field apex-item-text{cls}" value="Text">' },
+    { id: 'date', label: 'Date picker', plural: 'Date pickers', category: 'form', surface: 'item',
+      members: items([['NATIVE_DATE_PICKER_APEX', 'Date Picker'], ['NATIVE_DATEPICKER_APEX', 'Date Picker'], ['NATIVE_DATE_PICKER', 'Date Picker']]),
+      sample: FIELD, themeMark: ':has(.apex-item-datepicker, .a-DatePicker)',
+      themeSample: '<span class="apex-item-datepicker"><input class="text_field apex-item-text{cls}" value="2026-11-11"></span>' },
+    { id: 'select', label: 'List', plural: 'Lists', category: 'form', surface: 'item',
+      members: items([['NATIVE_SELECT_LIST', 'Select List'], ['NATIVE_POPUP_LOV', 'Popup LOV'], ['NATIVE_COMBOBOX', 'Combobox']]),
+      sample: FIELD, themeMark: ':has(select, .apex-item-popup-lov, .a-Combobox)',
+      themeSample: '<select class="selectlist apex-item-select{cls}"><option>One</option></select>' },
+    { id: 'choice', label: 'Checkbox or radio', plural: 'Checkboxes and radios', category: 'selection', surface: 'item',
+      members: items([['NATIVE_CHECKBOX', 'Checkbox Group'], ['NATIVE_RADIOGROUP', 'Radio Group'], ['NATIVE_SINGLE_CHECKBOX', 'Checkbox']]),
+      sample: '<div class="apex-item-group"><div class="apex-item-option"><input type="radio" checked id="{id}-a"><label for="{id}-a">One</label></div>' +
+        '<div class="apex-item-option"><input type="radio" id="{id}-b"><label for="{id}-b">Two</label></div></div>',
+      themeMark: ':has(.apex-item-checkbox, .apex-item-radio)',
+      themeSample: '<div class="apex-item-radio{cls}"><div class="apex-item-option"><input type="radio" checked><label>One</label></div><div class="apex-item-option"><input type="radio"><label>Two</label></div></div>' },
+    { id: 'switch', label: 'Switch', plural: 'Switches', category: 'selection', surface: 'item', members: items([['NATIVE_YES_NO', 'Switch']]),
+      sample: '<span class="a-Switch"><input type="checkbox" checked><span class="a-Switch-toggle"></span></span>',
+      themeMark: ':has(.a-Switch)',
+      themeSample: '<span class="a-Switch{cls}"><input type="checkbox" checked><span class="a-Switch-toggle"></span></span>' },
+    { id: 'button', label: 'Button', plural: 'Buttons', category: 'action', surface: 'button', members: [{ kind: 'button', label: 'Button' }],
+      sample: '<button id="{id}" type="button" class="t-Button">Button</button>',
+      themeSample: '<button type="button" class="t-Button{cls}"><span class="t-Button-label">Button</span></button>' },
+    { id: 'display', label: 'Display only', plural: 'Display only', category: 'display', surface: 'item', members: items([['NATIVE_DISPLAY_ONLY', 'Display Only']]),
+      sample: '<span class="display_only">Value</span>', themeMark: ':has(.display_only)',
+      themeSample: '<span class="display_only{cls}">Value</span>' },
+    { id: 'region', label: 'Region', plural: 'Regions', category: 'region', surface: 'region',
+      members: [{ kind: 'region', label: 'Standard Region' }, { kind: 'region', apexType: 'NATIVE_STATIC', label: 'Static Content' }],
+      sample: '<div class="t-Region" id="{id}"><div class="t-Region-header"><h2 class="t-Region-title">Title</h2></div><div class="t-Region-body">Body</div></div>',
+      themeMark: ':not(:has(.a-CardView, .a-IRR, .a-IG, .t-Report))', themeSample: 'Body text' },
+    { id: 'classic', label: 'Classic report', plural: 'Classic reports', category: 'report', surface: 'region',
+      members: [{ kind: 'region', apexType: 'NATIVE_SQL_REPORT', label: 'Classic Report' }], match: reportOf('classic'),
+      sample: TABLE.classic, themeMark: ':has(.t-Report)', themeSample: '<div class="t-Report">' + TABLE.classic + '</div>' },
+    { id: 'ir', label: 'Interactive report', plural: 'Interactive reports', category: 'report', surface: 'region',
+      members: [{ kind: 'region', apexType: 'NATIVE_IR', label: 'Interactive Report' }], match: reportOf('ir'),
+      sample: TABLE.ir, themeMark: ':has(.a-IRR)', themeWrap: IRR_WRAP,
+      themeSample: '<div class="a-IRR"><div class="a-IRR-toolbar"><span class="a-IRR-search">Search</span> <span class="a-IRR-actions">Actions</span></div>' + TABLE.ir + '</div>' },
+    { id: 'ig', label: 'Interactive grid', plural: 'Interactive grids', category: 'report', surface: 'region',
+      members: [{ kind: 'region', apexType: 'NATIVE_IG', label: 'Interactive Grid' }], match: reportOf('ig'),
+      sample: TABLE.ig, themeMark: ':has(.a-IG)', themeWrap: IRR_WRAP,
+      themeSample: '<div class="a-IG"><div class="a-IG-header">Toolbar</div>' + TABLE.ig + '</div>' },
+    { id: 'cards', label: 'Cards', plural: 'Cards', category: 'region', surface: 'region', members: [{ kind: 'region', apexType: 'NATIVE_CARDS', label: 'Cards' }],
+      sample: TABLE.cards, themeMark: ':has(.a-CardView)', themeSample: '<div class="a-CardView-items">' + TABLE.cards + '</div>' },
     // Charts have no designs here: the Chart Designer is their editor.
-    { id: 'chart', label: 'Chart', plural: 'Charts', category: 'region', editor: 'chart',
+    { id: 'chart', label: 'Chart', plural: 'Charts', category: 'region', surface: 'region', editor: 'chart',
       members: [{ kind: 'region', apexType: 'NATIVE_JET_CHART', label: 'Chart' }] }
   ];
   var REG = window.VD.componentRegistry;

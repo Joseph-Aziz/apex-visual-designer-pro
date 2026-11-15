@@ -53,6 +53,7 @@
       if (!m || !has(KINDS, m.kind)) fail(what, 'a member kind must be item, button or region');
       if (!text(m.label)) fail(what, 'a member needs a label');
     });
+    if (def.surface && !has(KINDS, def.surface)) fail(what, 'the surface must be item, button or region');
     if (def.match && typeof def.match !== 'function') fail(what, 'match must be a function');
     if (!def.variants || (!def.variants.length && !text(def.editor))) fail(what, 'at least one design is needed');
     var seen = {};
@@ -68,6 +69,7 @@
     Object.keys(def).forEach(function (k) { family[k] = def[k]; });
     family.members = def.members.slice();
     family.params = (def.params || []).slice();
+    family.surface = def.surface || def.members[0].kind;
     family.variants = def.variants.map(function (v) { v.builtIn = true; return v; });
     family.defaultVariant = def.defaultVariant || (def.variants[0] ? def.variants[0].id : null);
     list.push(family);
