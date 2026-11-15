@@ -93,7 +93,8 @@
 
   function hasPage() { return state.page != null; }
   function dirty() { return hasPage() && JSON.stringify(state.design) !== state.savedJson; }
-  function output() { return G().generate({ app: state.app, page: state.page, components: state.design.components },
+  // components: the design's components, or a tried-on copy of them.
+  function output(components) { return G().generate({ app: state.app, page: state.page, components: components || state.design.components },
     { echartsUrl: G().echartsUrl(document.baseURI), chartRuntimeUrls: chartRuntimeUrls() }); }
   // The saved page loads the chart runtime from these plug-in file URLs.
   function chartRuntimeUrls() {
@@ -201,18 +202,28 @@
   }
 
   // ------------------------------------------------------------ editing
+  // A copy of the design components with page component c given design variantId (null: none).
+  // values replaces its settings; without it the same design keeps them and another starts empty.
+  function withChoice(components, c, variantId, values) {
+    var prev = components.filter(function (x) { return x.key === c.key; })[0];
+    var list = components.filter(function (x) { return x.key !== c.key; });
+    if (variantId) {
+      list.push({ key: c.key, kind: c.kind, name: c.name, staticId: c.staticId || null, type: c.type || null,
+        component: c.component || null, variant: variantId,
+        values: values || (prev && prev.variant === variantId ? prev.values : {}) });
+    }
+    return list;
+  }
   function setVariant(key, variantId) {
     remember();
-    var c = component(key);
-    var list = state.design.components.filter(function (x) { return x.key !== key; });
-    if (variantId) {
-      var prev = choice(key);
-      list.push({ key: key, kind: c.kind, name: c.name, staticId: c.staticId || null, type: c.type || null,
-        component: c.component || null, variant: variantId,
-        values: prev && prev.variant === variantId ? prev.values : {} });
-    }
-    state.design.components = list;
+    state.design.components = withChoice(state.design.components, component(key), variantId);
     render();
+  }
+  // Pointing at or focusing a gallery card shows it on the real component; null shows the design
+  // again. The design, undo and the saved state are untouched.
+  function tryOn(c, card) {
+    if (!card || !card.variant) { applyPreview(); return; }
+    applyPreview(withChoice(state.design.components, c, card.variant));
   }
 
   // Keeps the design and clears its settings, as one undo step.
@@ -235,8 +246,8 @@
   }
 
   // ------------------------------------------------------------ preview
-  function applyPreview() {
-    var out = output();
+  function applyPreview(components) {
+    var out = output(components);
     var sel = state.selected && component(state.selected);
     var selector = sel && G().selectorFor(sel);
     var css = out.css + (selector ? '\n' + selector + '{outline:2px dashed #C9A227;outline-offset:3px}' : '');
@@ -584,7 +595,8 @@
       }
       right.innerHTML = '<h3>' + esc(c.label) + '</h3>' + themeStyleHtml(c) + t.html + params;
       bindThemeStyle(right, c);
-      VD.flParams.bindGallery(right, { pick: function (id) { setVariant(c.key, id); }, reset: function () { resetValues(c.key); } });
+      VD.flParams.bindGallery(right, { pick: function (id) { setVariant(c.key, id); },
+        tryOn: function (card) { tryOn(c, card); }, reset: function () { resetValues(c.key); } });
       if (ch) {
         VD.flParams.bind(right, V().get(c.ftype, ch.variant), function (key, raw) { setValue(c.key, key, raw); },
           function (which, open) { state.sectionsOpen[which] = open; });
@@ -689,6 +701,7 @@
 
   window.VD.flutterMode = {
     browserTiles: browserTiles,
+    withChoice: withChoice,
     memberComponents: memberComponents,
     WIDTHS: WIDTHS,
     enter: function () {

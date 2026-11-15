@@ -55,13 +55,21 @@
     return { html: '<div class="fl-gallery"><div class="fl-variants">' + t.html + presets + '</div>' +
       (actions ? '<div class="fl-gallery-actions">' + actions + '</div>' : '') + '</div>', css: css };
   }
-  // on: { pick(designId), preset(index), reset(), save() }; a missing handler leaves its control inert.
+  // on: { pick(designId), preset(index), reset(), save(), tryOn(card) }; a missing handler leaves its
+  // control inert. tryOn gets { variant } or { preset } while a card is pointed at or focused, null after.
   function bindGallery(root, on) {
+    var tryOn = function (b, card) {
+      if (!on.tryOn) return;
+      ['mouseenter', 'focus'].forEach(function (t) { b.addEventListener(t, function () { on.tryOn(card); }); });
+      ['mouseleave', 'blur'].forEach(function (t) { b.addEventListener(t, function () { on.tryOn(null); }); });
+    };
     root.querySelectorAll('[data-variant]').forEach(function (b) {
       b.addEventListener('click', function () { if (on.pick) on.pick(b.getAttribute('data-variant')); });
+      tryOn(b, { variant: b.getAttribute('data-variant') });
     });
     root.querySelectorAll('[data-preset]').forEach(function (b) {
       b.addEventListener('click', function () { if (on.preset) on.preset(Number(b.getAttribute('data-preset'))); });
+      tryOn(b, { preset: Number(b.getAttribute('data-preset')) });
     });
     root.querySelectorAll('[data-gallery]').forEach(function (b) {
       b.addEventListener('click', function () { var f = on[b.getAttribute('data-gallery')]; if (f) f(); });
