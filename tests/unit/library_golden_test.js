@@ -31,7 +31,8 @@ function other(p) {
 }
 function allSet(variant) {
   const o = {};
-  variant.params.forEach((p) => { o[p.key] = other(p); });
+  // The disabled, read-only and error settings came after the fixture; they add CSS only when set.
+  variant.params.forEach((p) => { if (!['disabled', 'readonly', 'error'].includes(p.state)) o[p.key] = other(p); });
   return o;
 }
 function sum(text) { return { chars: text.length, sha256: crypto.createHash('sha256').update(text, 'utf8').digest('hex') }; }

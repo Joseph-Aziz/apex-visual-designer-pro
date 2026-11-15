@@ -32,4 +32,6 @@ assert.ok(/<label class="fl-param" data-for="gapB">/.test(P.html(depV, { mode: '
 assert.ok(P.html(V.get('button', 'v1'), {}, {}).includes('data-param="ripple"'), 'button has ripple');
 assert.ok(!P.html(V.get('text', 'v1'), {}, {}).includes('data-param="ripple"'), 'text has no ripple');
 
+assert.ok(/<summary>States<\/summary>[\s\S]*data-param="disabledOpacity"/.test(P.html(V.get('text', 'v1'), {}, {})), 'States section');
+
 console.log('fl_params_test: all passed');

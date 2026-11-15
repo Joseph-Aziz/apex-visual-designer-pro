@@ -136,7 +136,7 @@ F.types.forEach((t) => F.forType(t).forEach((v) => {
 const ADV = ['shadow', 'hoverBg', 'focusColor', 'focusWidth', 'fontFamily', 'letterSpacing', 'textTransform',
   'lineHeight', 'width', 'maxWidth', 'marginBlock', 'align', 'motion', 'ripple', 'customCss'];
 F.types.forEach((t) => F.forType(t).forEach((v) => {
-  const keys = v.params.filter((p) => p.section === 'advanced').map((p) => p.key);
+  const keys = v.params.filter((p) => p.section === 'advanced' || ['hover', 'focus'].includes(p.state)).map((p) => p.key);
   // Ripple on press is offered only by the designs that have a ripple.
   assert.strictEqual(keys.join(), ADV.filter((k) => k !== 'ripple' || v.needsJs).join(), t + v.id + ' advanced keys');
   v.params.filter((p) => p.section === 'advanced').forEach((p) => assert.strictEqual(p.default, '', t + v.id + p.key + ' default'));
@@ -281,6 +281,42 @@ bad([{ key: 'x', label: 'X', kind: 'select', options: ['a'], default: '', min: 1
 bad([{ key: 'x', label: 'X', kind: 'px', default: '', section: 'nowhere' }]);
 bad([{ key: 'x', label: 'X', kind: 'px', default: '', dependsOn: { key: 'missing', equals: 'a' } }]);
 bad([{ key: 'm', label: 'M', kind: 'select', options: ['a'], default: 'a' }, { key: 'x', label: 'X', kind: 'px', default: '', dependsOn: { key: 'm' } }]);
+}
+
+// ---- state settings: empty by default, one scoped rule each when set
+{
+  const rules = (css) => (css.match(/\{/g) || []).length;
+  const STATE_KEYS = { hover: ['hoverBg'], focus: ['focusColor', 'focusWidth'], disabled: ['disabledOpacity', 'disabledBg'],
+    readonly: ['readonlyBg', 'readonlyText'], error: ['errorColor'] };
+  const sample = { hoverBg: '#111111', focusColor: '#222222', focusWidth: 3, disabledOpacity: 0.5, disabledBg: '#333333',
+    readonlyBg: '#444444', readonlyText: '#555555', errorColor: '#666666' };
+  const want = { text: ['hover', 'focus', 'disabled', 'readonly', 'error'], select: ['hover', 'focus', 'disabled', 'readonly', 'error'],
+    choice: ['hover', 'focus', 'disabled', 'error'], button: ['hover', 'focus', 'disabled'], region: ['hover', 'focus'] };
+  Object.keys(want).forEach((type) => {
+    const v = F.forType(type)[0];
+    const st = v.params.filter((p) => p.state);
+    assert.deepStrictEqual([...new Set(st.map((p) => p.state))], want[type], type + ' states in order');
+    st.forEach((p) => {
+      assert.strictEqual(p.section, 'state', p.key + ' in the States section');
+      assert.strictEqual(p.default, '', p.key + ' empty by default');
+      assert.deepStrictEqual(STATE_KEYS[p.state].includes(p.key), true, p.key + ' belongs to ' + p.state);
+    });
+    const base = v.css('#X', F.values(v, {}));
+    st.forEach((p) => {
+      const one = v.css('#X', F.values(v, { [p.key]: sample[p.key] }));
+      assert.strictEqual(rules(one), rules(base) + 1, type + ' ' + p.key + ' adds exactly one rule');
+      assert.ok(one.startsWith(base) || one.includes(String(sample[p.key])), type + ' ' + p.key + ' uses its value');
+    });
+  });
+  const t = F.forType('text')[0], b = F.forType('button')[0];
+  assert.ok(t.css('#X', F.values(t, { disabledOpacity: 0.5 })).includes('.apex_disabled'), 'disabled targets apex_disabled');
+  assert.ok(b.css('#X', F.values(b, { disabledBg: '#333333' })).includes(':disabled'), 'button disabled targets :disabled');
+  assert.ok(t.css('#X', F.values(t, { readonlyBg: '#444444' })).includes('[readonly]'), 'read-only targets [readonly]');
+  assert.ok(t.css('#X', F.values(t, { errorColor: '#666666' })).includes('.apex-page-item-error'), 'error targets the error class');
+  assert.strictEqual(F.cleanParam(t.params.filter((p) => p.key === 'disabledOpacity')[0], '1.5'), null, 'opacity above 1 rejected');
+  const badS = (params) => assert.throws(() => window.VD.componentRegistry.registerVariant('display', { id: 'bad2', label: 'Bad', css: () => '', params }));
+  badS([{ key: 'x', label: 'X', kind: 'color', default: '', section: 'state', state: 'pressed' }]);
+  badS([{ key: 'x', label: 'X', kind: 'color', default: '#fff', section: 'state', state: 'hover' }]);
 }
 
 console.log('flutter_variants_test: all passed');

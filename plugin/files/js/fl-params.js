@@ -64,6 +64,7 @@
   var SECTIONS = [
     { id: 'icon', cls: 'fl-icon-section', label: 'Icon', open: true },
     { id: 'hide', cls: 'fl-hide-section', label: 'Show / hide' },
+    { id: 'state', cls: 'fl-state-section', label: 'States' },
     { id: 'advanced', cls: 'fl-adv-section', label: 'Advanced' }
   ];
 

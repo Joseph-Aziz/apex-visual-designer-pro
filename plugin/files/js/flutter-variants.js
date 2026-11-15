@@ -442,11 +442,13 @@
     serif: { stack: 'Georgia, "Times New Roman", serif' }
   };
   function ADV(key, label, kind, options) { var o = p(key, label, kind, ''); o.section = 'advanced'; if (options) o.options = options; return o; }
+  // A state setting: empty by default, listed in the States section under its state.
+  function STATE(state, o) { o.section = 'state'; o.state = state; return o; }
   var advancedParams = [
     ADV('shadow', 'Shadow', 'select', ['none', 'sm', 'md', 'lg']),
-    ADV('hoverBg', 'Hover background', 'color'),
-    ADV('focusColor', 'Focus ring colour', 'color'),
-    ADV('focusWidth', 'Focus ring width', 'px'),
+    STATE('hover', ADV('hoverBg', 'Hover background', 'color')),
+    STATE('focus', ADV('focusColor', 'Focus ring colour', 'color')),
+    STATE('focus', ADV('focusWidth', 'Focus ring width', 'px')),
     ADV('fontFamily', 'Font', 'select', Object.keys(FONTS)),
     ADV('letterSpacing', 'Letter spacing (px)', 'number'),
     ADV('textTransform', 'Text case', 'select', ['none', 'uppercase', 'capitalize', 'lowercase']),
@@ -496,6 +498,39 @@
       return css;
     };
   }
+  // ---- disabled, read-only and error states: one scoped rule per state, only when set
+  var F = S.field;
+  var STATE_TYPES = {
+    disabled: ['text', 'date', 'select', 'choice', 'switch', 'button'],
+    readonly: ['text', 'date', 'select'],
+    error: ['text', 'date', 'select', 'choice', 'switch']
+  };
+  var stateParams = [
+    STATE('disabled', ADV('disabledOpacity', 'Disabled opacity (0 to 1)', 'number')),
+    STATE('disabled', ADV('disabledBg', 'Disabled background', 'color')),
+    STATE('readonly', ADV('readonlyBg', 'Read-only background', 'color')),
+    STATE('readonly', ADV('readonlyText', 'Read-only text', 'color')),
+    STATE('error', ADV('errorColor', 'Error colour', 'color'))
+  ];
+  stateParams[0].min = 0; stateParams[0].max = 1;
+  function statesOf(type) { return stateParams.filter(function (prm) { return STATE_TYPES[prm.state].indexOf(type) >= 0; }); }
+  function stateCss(type) {
+    var surf = SURFACE[type];
+    // Items: the container holds the disabled or failed input; a button is disabled itself.
+    var on = function (has) { return surf && type !== 'button' ? within(surf)(':has(' + has + ')') : pseudo(surf, ':is(' + has + ')'); };
+    return function (sel, v) {
+      var css = '', d = '';
+      if (isSet(v.disabledOpacity)) d += 'opacity:' + v.disabledOpacity + ';';
+      if (isSet(v.disabledBg)) d += ' background:' + v.disabledBg + ';';
+      if (d) css += rule(sel, on(':disabled, .apex_disabled'), d);
+      var r = '';
+      if (isSet(v.readonlyBg)) r += 'background:' + v.readonlyBg + ';';
+      if (isSet(v.readonlyText)) r += ' color:' + v.readonlyText + ';';
+      if (r) css += rule(sel, pseudo(surf, '[readonly]') + ', ' + F.display, r);
+      if (isSet(v.errorColor)) css += rule(sel, on('.apex-page-item-error') + ', ' + F.error, 'border-color:' + v.errorColor + '; color:' + v.errorColor + ';');
+      return css;
+    };
+  }
   // ---- show / hide switches: 'hide' emits display:none, 'show' or empty emits nothing
   var H = S.hide;
   var HIDE_LABELS = { hideSearch: 'Search bar', hideActions: 'Actions button', hideRowsPerPage: 'Rows per page', hideReset: 'Reset button',
@@ -525,13 +560,13 @@
   }
 
   Object.keys(LIBRARY).forEach(function (type) {
-    var extra = advancedCss(type), hide = hideCss(type), hp = hideParams(type);
+    var extra = advancedCss(type), hide = hideCss(type), hp = hideParams(type), st = statesOf(type), state = stateCss(type);
     LIBRARY[type] = LIBRARY[type].map(function (v) {
       var base = v.css;
       // Ripple on press is offered only by the designs that have a ripple.
       var adv = advancedParams.filter(function (prm) { return prm.key !== 'ripple' || v.needsJs; });
-      var out = { type: v.type, id: v.id, label: v.label, needsJs: v.needsJs, params: v.params.concat(hp, adv),
-        css: function (sel, vals) { return base(sel, vals) + hide(sel, vals) + extra(sel, vals); } };
+      var out = { type: v.type, id: v.id, label: v.label, needsJs: v.needsJs, params: v.params.concat(hp, adv, st),
+        css: function (sel, vals) { return base(sel, vals) + hide(sel, vals) + extra(sel, vals) + state(sel, vals); } };
       if (v.font) out.font = v.font;
       if (v.js) out.js = v.js;
       return out;
