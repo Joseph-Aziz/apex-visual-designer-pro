@@ -52,12 +52,13 @@
   function render(el, opts) {
     var p = current() || { app: opts.app || '', page: '' };
     el.innerHTML =
-      '<strong>Page</strong>' +
-      '<label class="lk-inline">App <input type="number" class="pb-app" min="1" value="' + esc(p.app) + '"></label>' +
-      '<label class="lk-inline">Page <input type="number" class="pb-page" min="0" value="' + esc(p.page) + '"></label>' +
-      '<button class="vd-btn vd-btn--ghost pb-add-app" title="Let the designer work on this application">Add application</button>' +
-      '<button class="vd-btn vd-btn--secondary pb-open">Open page</button>' +
-      '<span class="lk-msg pb-msg" role="status"></span>';
+      '<div class="vd-page-fields"><strong>Page</strong>' +
+      '<span class="vd-page-context-label">Working context</span>' +
+      '<label class="lk-inline">App <input type="number" class="pb-app" min="1" aria-label="Application ID" value="' + esc(p.app) + '"></label>' +
+      '<label class="lk-inline">Page <input type="number" class="pb-page" min="0" aria-label="Page number" value="' + esc(p.page) + '"></label></div>' +
+      '<div class="vd-page-actions"><button type="button" class="vd-btn vd-btn--ghost pb-add-app" title="Let the designer work on this application">Add application</button>' +
+      '<button type="button" class="vd-btn vd-btn--secondary pb-open" title="Load a page to design">Open page</button>' +
+      '<span class="lk-msg pb-msg" role="status"></span></div>';
     var msg = el.querySelector('.pb-msg');
     el.querySelector('.pb-open').addEventListener('click', function () {
       var r = parse(el.querySelector('.pb-app').value, el.querySelector('.pb-page').value);

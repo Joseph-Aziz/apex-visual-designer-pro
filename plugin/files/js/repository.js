@@ -19,11 +19,34 @@
     return null;
   }
 
+  // Connection state shown in the top bar: offline (no APEX region), ready (no call yet),
+  // connected (the last call answered) or error (the last call failed).
+  var state = apexApi() ? 'ready' : 'offline';
+  var listeners = [];
+  function setStatus(next) {
+    if (next === state) return;
+    state = next;
+    listeners.forEach(function (fn) { try { fn(state); } catch (e) { /* listener failed */ } });
+  }
+  function status() { return state; }
+  function onStatus(fn) { listeners.push(fn); fn(state); }
+
   var PART = { VD_PAGE_COMPONENTS: 'components', VD_FLUTTER: 'flutter', VD_THEME: 'theme', VD_REGISTER: 'register' };
 
   function callProcess(name, data) {
     var api = apexApi(), ajax = VD.config && VD.config.ajax;
-    if (!api || !ajax) return Promise.reject(repoError('VD_OFFLINE', 'The designer must run inside an APEX Visual Designer region.'));
+    if (!api || !ajax) {
+      setStatus('offline');
+      return Promise.reject(repoError('VD_OFFLINE', 'The designer must run inside an APEX Visual Designer region.'));
+    }
+    return send(api, ajax, name, data).then(function (r) { setStatus('connected'); return r; }, function (e) {
+      // A refusal from the repository still means the server answered.
+      setStatus(e && e.code && e.code !== 'VD_TRANSPORT' ? 'connected' : 'error');
+      throw e;
+    });
+  }
+
+  function send(api, ajax, name, data) {
     var payload = {};
     Object.keys(data || {}).forEach(function (k) { payload[k] = data[k]; });
     payload.x10 = PART[name];
@@ -132,6 +155,8 @@
   function restoreTheme(appId, versionId) { return themeCall('restore', appId, { x03: String(versionId) }); }
 
   VD.repository = {
+    status: status,
+    onStatus: onStatus,
     setCssClass: setCssClass,
     readTheme: readTheme,
     saveThemeDraft: saveThemeDraft,

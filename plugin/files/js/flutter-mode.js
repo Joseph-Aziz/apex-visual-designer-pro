@@ -93,6 +93,11 @@
 
   function hasPage() { return state.page != null; }
   function dirty() { return hasPage() && JSON.stringify(state.design) !== state.savedJson; }
+  // Drops the unsaved design: the page's saved design and a fresh undo stack replace it.
+  function discard() {
+    state.design = VD.chartMigrate.design(JSON.parse(state.savedJson)).design;
+    state.undo = VD.undoStack.create(100);
+  }
   // components: the design's components, or a tried-on copy of them.
   function output(components) { return G().generate({ app: state.app, page: state.page, components: components || state.design.components },
     { echartsUrl: G().echartsUrl(document.baseURI), chartRuntimeUrls: chartRuntimeUrls() }); }
@@ -170,9 +175,14 @@
   function savePreset(c) {
     var ch = choice(c.key);
     if (!ch || !ch.variant || state.busy) return;
-    var name = window.prompt('Name of the new preset (it is saved into the theme of app ' + state.app + ' as a draft):', V().get(c.ftype, ch.variant).label);
-    name = String(name || '').trim().slice(0, 40);
-    if (!name) return;
+    // CHANGED: window.prompt is blocked in the editor's iframe; VD.ask asks for the name instead.
+    VD.ask('Name of the new preset (it is saved into the theme of app ' + state.app + ' as a draft):',
+      { input: V().get(c.ftype, ch.variant).label, maxLength: 40, ok: 'Save preset' }).then(function (name) {
+      name = String(name || '').trim().slice(0, 40);
+      if (name) savePresetNamed(c, ch, name);
+    });
+  }
+  function savePresetNamed(c, ch, name) {
     var t = addPreset(state.theme || { global: {}, types: {} }, c.ftype, name, ch.variant, ch.values);
     var bad = VD.themeCodegen.validate(t);
     if (bad && bad.length) { setMessage(bad[0]); return; }
@@ -208,15 +218,19 @@
     var sel = right.querySelector('.fl-theme-pick');
     if (!sel) return;
     sel.addEventListener('change', function () {
-      if (dirty() && !window.confirm('Setting the theme style reloads the page and discards unsaved design changes. Continue?')) {
-        sel.value = currentStyle(c.cssClasses, c.ftype); return;
+      function setStyle() {
+        sel.disabled = true;
+        setMessage('Setting the theme style…');
+        VD.repository.setCssClass(state.app, state.page, c.kind, c.id, c.ftype, sel.value)
+          .then(function () { var key = c.key; return attach(state.app, state.page).then(function () { state.selected = key; render(); }); })
+          .then(function () { setMessage(sel.value ? 'Theme style set: vd-' + c.ftype + '-' + sel.value + '.' : 'Theme style removed.'); })
+          .catch(function (e) { sel.disabled = false; setMessage(e.message); });
       }
-      sel.disabled = true;
-      setMessage('Setting the theme style…');
-      VD.repository.setCssClass(state.app, state.page, c.kind, c.id, c.ftype, sel.value)
-        .then(function () { var key = c.key; return attach(state.app, state.page).then(function () { state.selected = key; render(); }); })
-        .then(function () { setMessage(sel.value ? 'Theme style set: vd-' + c.ftype + '-' + sel.value + '.' : 'Theme style removed.'); })
-        .catch(function (e) { sel.disabled = false; setMessage(e.message); });
+      if (!dirty()) { setStyle(); return; }
+      VD.ask('Setting the theme style reloads the page and discards unsaved design changes. Continue?', { ok: 'Continue' }).then(function (ok) {
+        if (!ok) { sel.value = currentStyle(c.cssClasses, c.ftype); return; }
+        setStyle();
+      });
     });
   }
 
@@ -293,6 +307,8 @@
     remember(key + ' ' + param);
     ch.values = ch.values || {};
     ch.values[param] = value;
+    var reset = host.querySelector('.fl-right [data-gallery="reset"]');
+    if (reset) reset.hidden = false;
     applyPreview();
     renderTop();
   }
@@ -308,6 +324,13 @@
     var d = ok && VD.pagePreview.doc(frame);
     if (d && out.js && !d.getElementById('vd-flutter-js')) {
       var s = d.createElement('script'); s.id = 'vd-flutter-js'; s.textContent = out.js; d.body.appendChild(s);
+      d.vdStepJs = out.stepJs || '';
+    }
+    // The date arrows follow every change: their script is re-run whenever the list of items changes.
+    var step = out.stepJs || G().stepJs([]);
+    if (d && d.vdStepJs !== undefined && d.vdStepJs !== (out.stepJs || '')) {
+      var t = d.createElement('script'); t.textContent = step; d.body.appendChild(t); t.remove();
+      d.vdStepJs = out.stepJs || '';
     }
     if (d) scheduleCharts();
     return ok;
@@ -388,27 +411,30 @@
   // ------------------------------------------------------------ rendering
   function skeleton() {
     host.innerHTML =
-      '<div class="lk-top fl-top"></div><div class="lk-msg fl-msg" role="status"></div>' +
-      '<div class="lk-body"><aside class="lk-left fl-left"></aside>' +
+      '<div class="lk-top fl-top"></div>' + window.VD.hints.html('flutter', 'Pick a component, point at a look to try it, click to keep. Save to page when done.') + '<div class="lk-msg fl-msg" role="status"></div>' +
+      // CHANGED: each side panel has a heading above its generated content (.vd-pane-body).
+      '<div class="lk-body"><aside class="lk-left fl-left" aria-label="Component browser">' + VD.studio.paneHead('Page structure', 'Components', 'Choose an item or region to customize.') + '<div class="vd-pane-body"></div></aside>' +
       '<section class="lk-center"><div class="lk-preview fl-preview"></div><div class="lk-status fl-status" aria-live="polite"></div></section>' +
-      '<aside class="lk-right fl-right"></aside></div><style id="fl-thumbs-css"></style>';
+      '<aside class="lk-right fl-right" aria-label="Properties">' + VD.studio.paneHead('Properties', 'Style gallery', 'Point at a look to try it, click to keep it.') + '<div class="vd-pane-body"></div></aside></div><style id="fl-thumbs-css"></style>';
+    window.VD.hints.bind(host);
   }
 
   function renderTop() {
     var top = host.querySelector('.fl-top');
     top.innerHTML =
-      '<strong class="fl-title">Design items</strong>' +
+      '<span class="vd-toolbar-heading"><strong class="fl-title">Design Studio</strong></span>' +
       '<span class="lk-state">' + (hasPage() ? (dirty() ? 'Unsaved changes' : 'Saved') : '') + '</span>' +
       '<span class="lk-spacer"></span>' +
-      '<span class="fl-widths" role="group" aria-label="Preview width">' + ['desktop', 'tablet', 'mobile'].map(function (w) {
+      // CHANGED: toolbar grouped as preview size, edit, tools and the live action.
+      '<span class="vd-toolbar-group vd-toolbar-group--device"><span class="vd-toolbar-caption">Preview</span><span class="fl-widths" role="group" aria-label="Preview width">' + ['desktop', 'tablet', 'mobile'].map(function (w) {
         return '<button class="vd-btn vd-btn--ghost" data-width="' + w + '" aria-pressed="' + (state.width === w) + '">' + w.charAt(0).toUpperCase() + w.slice(1) + '</button>';
-      }).join('') + '</span>' +
-      '<button class="vd-btn vd-btn--ghost fl-undo" title="Undo (Ctrl+Z)"' + (state.undo && state.undo.canUndo() ? '' : ' disabled') + '>Undo</button>' +
-      '<button class="vd-btn vd-btn--ghost fl-redo" title="Redo (Ctrl+Y)"' + (state.undo && state.undo.canRedo() ? '' : ' disabled') + '>Redo</button>' +
-      '<button class="vd-btn vd-btn--ghost fl-use-page" aria-pressed="' + state.usePage + '" title="Use the page in the preview: fill items and submit, for example to show a chart that needs dates. Turn off to select components again.">' +
+      }).join('') + '</span></span>' +
+      '<span class="vd-toolbar-group vd-toolbar-group--edit"><button class="vd-btn vd-btn--ghost fl-undo" title="Undo (Ctrl+Z)"' + (state.undo && state.undo.canUndo() ? '' : ' disabled') + '>Undo</button>' +
+      '<button class="vd-btn vd-btn--ghost fl-redo" title="Redo (Ctrl+Y)"' + (state.undo && state.undo.canRedo() ? '' : ' disabled') + '>Redo</button></span>' +
+      '<span class="vd-toolbar-group vd-toolbar-group--tools"><button class="vd-btn vd-btn--ghost fl-use-page" aria-pressed="' + state.usePage + '" title="Use the page in the preview: fill items and submit, for example to show a chart that needs dates. Turn off to select components again.">' +
         (state.usePage ? 'Using page: on' : 'Use page') + '</button>' +
-      '<button class="vd-btn vd-btn--ghost fl-history"' + (hasPage() ? '' : ' disabled') + '>History</button>' +
-      '<button class="vd-btn vd-btn--primary fl-save"' + (hasPage() && dirty() && !state.busy ? '' : ' disabled') + '>Save to page</button>';
+      '<button class="vd-btn vd-btn--ghost fl-history" title="Earlier saved versions"' + (hasPage() ? '' : ' disabled') + '>History</button></span>' +
+      '<span class="vd-toolbar-primary"><button class="vd-btn vd-btn--primary fl-save" title="Writes the design into this page now. The app may ask you to log in again."' + (hasPage() && dirty() && !state.busy ? '' : ' disabled') + '>Save to page <span aria-hidden="true" class="vd-action-kind">LIVE</span></button></span>';
     top.querySelector('.fl-history').addEventListener('click', openHistory);
     top.querySelector('.fl-undo').addEventListener('click', function () { step(false); });
     top.querySelector('.fl-redo').addEventListener('click', function () { step(true); });
@@ -471,7 +497,7 @@
 
   function renderLeft() {
     var all = state.leftView === 'all';
-    var left = host.querySelector('.fl-left');
+    var left = host.querySelector('.fl-left > .vd-pane-body');
     left.innerHTML = '<div class="fl-left-views" role="tablist">' +
       '<button class="vd-btn vd-btn--ghost" data-view="page" aria-pressed="' + !all + '">On this page</button>' +
       '<button class="vd-btn vd-btn--ghost" data-view="all" aria-pressed="' + all + '">All components</button></div>' +
@@ -587,12 +613,17 @@
       type: function (t) { setChart(c.key, CD().set(ch.chart, 'type', t || undefined)); renderChartPanel(right, c); },
       template: function (id) {
         var t = CD().template(id);
-        if (!t || !window.confirm('Replace the settings of this chart with the template? Undo brings them back.')) { renderChartPanel(right, c); return; }
-        setChart(c.key, t); renderChartPanel(right, c);
+        if (!t) { renderChartPanel(right, c); return; }
+        VD.ask('Replace the settings of this chart with the template? Undo brings them back.').then(function (ok) {
+          if (!ok) { renderChartPanel(right, c); return; }
+          setChart(c.key, t); renderChartPanel(right, c);
+        });
       },
       resetAll: function () {
-        if (!window.confirm('Reset every setting of this chart to how APEX draws it?')) return;
-        setChart(c.key, { version: 1, engine: ch.chart.engine || 'jet' }); renderChartPanel(right, c);
+        VD.ask('Reset every setting of this chart to how APEX draws it?').then(function (ok) {
+          if (!ok) return;
+          setChart(c.key, { version: 1, engine: ch.chart.engine || 'jet' }); renderChartPanel(right, c);
+        });
       },
       addRef: function () { setChart(c.key, CD().addRef(ch.chart)); renderChartPanel(right, c); },
       removeRef: function (i) { setChart(c.key, CD().removeRef(ch.chart, i)); renderChartPanel(right, c); },
@@ -608,7 +639,7 @@
 
   function renderRight() {
     renderStatus();
-    var right = host.querySelector('.fl-right');
+    var right = host.querySelector('.fl-right > .vd-pane-body');
     var c = state.selected && component(state.selected);
     var thumbCss = '';
     var chartOpen = !!(c && state.chartKey === c.key && choice(c.key) && choice(c.key).chart);
@@ -709,21 +740,25 @@
     if (cssCheck.error || jsCheck.error) { setMessage(cssCheck.error || jsCheck.error); return; }
     var tooBig = G().sizeError(cssCheck.text, jsCheck.text);
     if (tooBig) { setMessage(tooBig); return; }
-    state.busy = true; renderTop();
-    setMessage('Saving into page ' + state.page + '…');
-    VD.repository.saveFlutter(state.app, state.page, state.token, VD.chartMigrate.strip(state.design), out.css, out.js)
-      .then(function () {
-        state.busy = false;
-        return attach(state.app, state.page).then(function () {
-          setMessage('Saved into page ' + state.page + '. Its own CSS and JS outside the designer block are unchanged.');
-          if (then) then();
-        });
-      })
-      .catch(function (e) { state.busy = false; setMessage(e.message); renderTop(); });
+    var pageText = state.page == null ? 'this page' : 'page ' + state.page;
+    VD.ask('Write this design into ' + pageText + ' now? You may need to log in again.').then(function (ok) {
+      if (!ok) return;
+      state.busy = true; renderTop();
+      setMessage('Saving into page ' + state.page + '…');
+      VD.repository.saveFlutter(state.app, state.page, state.token, VD.chartMigrate.strip(state.design), out.css, out.js)
+        .then(function () {
+          state.busy = false;
+          return attach(state.app, state.page).then(function () {
+            setMessage('Saved into page ' + state.page + '. Its own CSS and JS outside the designer block are unchanged.');
+            if (then) then();
+          });
+        })
+        .catch(function (e) { state.busy = false; setMessage(e.message); renderTop(); });
+    });
   }
 
   function openHistory() {
-    var right = host.querySelector('.fl-right');
+    var right = host.querySelector('.fl-right > .vd-pane-body');
     right.innerHTML = '<h3>History of page ' + esc(state.page) + '</h3><p class="lk-hint">Loading…</p>';
     VD.repository.flutterHistory(state.app, state.page).then(function (res) {
       var rows = (res.versions || []).map(function (v) {
@@ -736,12 +771,14 @@
       right.querySelector('.fl-close').addEventListener('click', function () { renderRight(); });
       right.querySelectorAll('[data-restore]').forEach(function (b) {
         b.addEventListener('click', function () {
-          if (!window.confirm('Put this version of the CSS and JS back into page ' + state.page + '? The current code is kept in History.')) return;
-          setMessage('Restoring…');
-          VD.repository.restoreFlutter(state.app, state.page, b.getAttribute('data-restore'), state.token)
-            .then(function () { return attach(state.app, state.page); })
-            .then(function () { setMessage('Restored. Page ' + state.page + ' has that version of its CSS and JS again.'); })
-            .catch(function (e) { setMessage(e.message); });
+          VD.ask('Put this version of the CSS and JS back into page ' + state.page + '? The current code is kept in History.').then(function (ok) {
+            if (!ok) return;
+            setMessage('Restoring…');
+            VD.repository.restoreFlutter(state.app, state.page, b.getAttribute('data-restore'), state.token)
+              .then(function () { return attach(state.app, state.page); })
+              .then(function () { setMessage('Restored. Page ' + state.page + ' has that version of its CSS and JS again.'); })
+              .catch(function (e) { setMessage(e.message); });
+          });
         });
       });
     }).catch(function (e) { setMessage(e.message); });
@@ -773,19 +810,27 @@
       render(!frame);
     },
     // From the page bar; false keeps the open page (the user kept the unsaved changes).
-    open: function (app, page) {
-      if (dirty() && !window.confirm('Discard unsaved changes on this page?')) return false;
+    open: function (app, page, confirmed) {
+      if (dirty() && !confirmed) {
+        VD.ask('Discard unsaved changes on this page?', { ok: 'Discard' }).then(function (ok) {
+          if (ok) VD.app.openPage(app, page, true);
+        });
+        return false;
+      }
       attach(app, page);
       return true;
     },
     // false keeps the designer open: the user cancelled, or chose Save (then onLeave runs after it).
     leave: function (onLeave) {
       if (!dirty()) return true;
-      if (window.confirm('This page has unsaved design changes. Save them now?\n\nOK saves them; Cancel lets you discard them or stay.')) {
-        save(onLeave);
-        return false;
-      }
-      if (window.confirm('Discard the unsaved design changes?')) { state.design = VD.chartMigrate.design(JSON.parse(state.savedJson)).design; state.undo = VD.undoStack.create(100); return true; }
+      VD.ask('This page has unsaved design changes. Save them now?\n\nOK saves them; Cancel lets you discard them or stay.').then(function (ok) {
+        if (ok) { save(onLeave); return; }
+        VD.ask('Discard the unsaved design changes?', { ok: 'Discard' }).then(function (discardIt) {
+          if (!discardIt) return;
+          discard();
+          onLeave();
+        });
+      });
       return false;
     },
     attach: attach,

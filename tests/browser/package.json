@@ -1,0 +1,11 @@
+{
+  "name": "apex-visual-designer-browser-smoke",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node run.js"
+  },
+  "devDependencies": {
+    "playwright": "1.65.1"
+  }
+}

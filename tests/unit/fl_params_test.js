@@ -41,7 +41,8 @@ assert.ok(/<summary>States<\/summary>[\s\S]*data-param="disabledOpacity"/.test(P
   assert.ok(/data-variant="v2"[^>]*>|is-selected" data-variant="v2"/.test(g.html), 'current design selected');
   assert.ok(g.html.includes('data-gallery="reset"'), 'Reset settings shown');
   assert.ok(!g.html.includes('data-gallery="save"'), 'no Save as preset until presets exist');
-  assert.ok(!P.gallery('text', { current: 'v2' }).html.includes('data-gallery="reset"'), 'no reset without values');
+  assert.ok(/data-gallery="reset"[^>]* hidden>/.test(P.gallery('text', { current: 'v2' }).html), 'reset hidden without values');
+  assert.ok(!/data-gallery="reset"[^>]* hidden>/.test(g.html), 'reset visible with values');
   const pg = P.gallery('text', { current: 'v1', preset: 0, canSave: true,
     presets: [{ label: 'Brand field', variant: 'v1', values: { radius: 12 } }] });
   assert.ok(pg.html.includes('data-preset="0"') && pg.html.includes('class="fl-badge fl-badge--custom">Custom<'), 'preset card with Custom badge');

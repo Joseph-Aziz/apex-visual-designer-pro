@@ -99,25 +99,29 @@
   // ------------------------------------------------------------ rendering
   function skeleton() {
     host.innerHTML =
-      '<div class="lk-top lb-top"></div><div class="lk-msg lb-msg" role="status"></div>' +
-      '<div class="lb-body"><section class="lb-board" tabindex="-1"></section>' +
+      '<div class="lk-top lb-top"></div>' + window.VD.hints.html('layout', 'Arrow keys move a box, Shift + arrow resizes it. Apply to page writes it.') + '<div class="lk-msg lb-msg" role="status"></div>' +
+      // CHANGED: the board keeps left-to-right order in RTL pages: its drag, drop-line, resize and arrow-key
+      // maths measure from the left edge (plan step C4 fallback).
+      '<div class="lb-body"><section class="lb-board" tabindex="-1" dir="ltr"></section>' +
       '<section class="lb-preview"></section></div>';
+    window.VD.hints.bind(host);
   }
 
   function renderTop() {
     var top = host.querySelector('.lb-top');
     top.innerHTML =
-      '<strong>Layout board</strong>' +
+      '<span class="vd-toolbar-heading"><strong class="fl-title">Layout Studio</strong></span>' +
       '<span class="lk-state">' + (state.board ? (dirty() ? 'Changes not applied' : 'Applied') : '') + '</span>' +
       '<span class="lk-spacer"></span>' +
-      '<button class="vd-btn vd-btn--ghost lb-revert"' + (dirty() && !state.busy ? '' : ' disabled') + '>Revert</button>' +
-      '<button class="vd-btn vd-btn--ghost lb-undo"' + (state.board && !dirty() && !state.busy ? '' : ' disabled') + '>Undo apply</button>' +
-      '<button class="vd-btn vd-btn--primary lb-apply"' + (dirty() && !state.busy ? '' : ' disabled') + '>Apply</button>' +
-      '<label class="lk-inline">Preview <select class="lb-pvmode">' +
+      // CHANGED: toolbar grouped as edit actions, the preview controls and the live action.
+      '<span class="vd-toolbar-group vd-toolbar-group--edit"><button type="button" class="vd-btn vd-btn--ghost lb-revert" title="Drop changes not yet applied"' + (dirty() && !state.busy ? '' : ' disabled') + '>Revert</button>' +
+      '<button type="button" class="vd-btn vd-btn--ghost lb-undo" title="Puts the page back as it was before the last apply"' + (state.board && !dirty() && !state.busy ? '' : ' disabled') + '>Undo last apply</button></span>' +
+      '<span class="vd-toolbar-group vd-toolbar-group--view"><label class="lk-inline">Preview <select class="lb-pvmode">' +
         '<option value="side">Side</option><option value="hidden">Hidden</option>' +
         '<option value="expanded">Expanded</option><option value="popout">Pop out</option></select></label>' +
       '<input type="range" class="lb-pvsize" min="20" max="80" step="5" value="' + pv.size + '" title="Preview width"' +
-        ' aria-label="Preview width"' + (pv.mode === 'side' ? '' : ' hidden') + '>';
+        ' aria-label="Preview width"' + (pv.mode === 'side' ? '' : ' hidden') + '></span>' +
+      '<span class="vd-toolbar-primary"><button type="button" class="vd-btn vd-btn--primary lb-apply" title="Writes the new layout into this page now"' + (dirty() && !state.busy ? '' : ' disabled') + '>Apply to page <span aria-hidden="true" class="vd-action-kind">LIVE</span></button></span>';
     top.querySelector('.lb-pvmode').value = pv.mode;
     top.querySelector('.lb-pvmode').addEventListener('change', function (ev) { setPreview({ mode: ev.target.value }); });
     top.querySelector('.lb-pvsize').addEventListener('input', function (ev) { setPreview({ size: Number(ev.target.value) }); });
@@ -363,19 +367,22 @@
 
   function apply(then) {
     if (!dirty() || state.busy) return Promise.resolve(false);
-    if (!window.confirm(reimportWarning('Applying the layout'))) return Promise.resolve(false);
-    state.busy = true; renderTop();
-    setMessage('Applying the layout to page ' + state.page + '…');
-    return VD.repository.applyLayout(state.app, state.page, state.json.token, M().changes(state.board))
-      .then(function () {
-        state.busy = false;
-        return attach(state.app, state.page).then(function () {
-          setMessage('Applied. Undo apply puts the previous layout back.');
-          if (then) then();
-          return true;
-        });
-      })
-      .catch(function (e) { state.busy = false; setMessage(e.message, true); renderTop(); return false; });
+    var pageText = state.page == null ? 'this page' : 'page ' + state.page;
+    return VD.ask('Write this layout into ' + pageText + ' now? You may need to log in again.').then(function (ok) {
+      if (!ok) return false;
+      state.busy = true; renderTop();
+      setMessage('Applying the layout to page ' + state.page + '…');
+      return VD.repository.applyLayout(state.app, state.page, state.json.token, M().changes(state.board))
+        .then(function () {
+          state.busy = false;
+          return attach(state.app, state.page).then(function () {
+            setMessage('Applied. Undo apply puts the previous layout back.');
+            if (then) then();
+            return true;
+          });
+        })
+        .catch(function (e) { state.busy = false; setMessage(e.message, true); renderTop(); return false; });
+    });
   }
 
   function revert() {
@@ -387,15 +394,17 @@
 
   function undo() {
     if (!state.board || dirty() || state.busy) return;
-    if (!window.confirm(reimportWarning('Undo apply'))) return;
-    state.busy = true; renderTop();
-    setMessage('Putting the previous layout back…');
-    VD.repository.undoLayout(state.app, state.page, state.json.token)
-      .then(function () {
-        state.busy = false;
-        return attach(state.app, state.page).then(function () { setMessage('The previous layout is back.'); });
-      })
-      .catch(function (e) { state.busy = false; setMessage(e.message, true); renderTop(); });
+    VD.ask(reimportWarning('Undo apply')).then(function (ok) {
+      if (!ok) return;
+      state.busy = true; renderTop();
+      setMessage('Putting the previous layout back…');
+      VD.repository.undoLayout(state.app, state.page, state.json.token)
+        .then(function () {
+          state.busy = false;
+          return attach(state.app, state.page).then(function () { setMessage('The previous layout is back.'); });
+        })
+        .catch(function (e) { state.busy = false; setMessage(e.message, true); renderTop(); });
+    });
   }
 
   window.VD.layoutMode = {
@@ -407,19 +416,27 @@
       render(!frame);
     },
     // From the page bar; false keeps the open page (the user kept the changes that are not applied).
-    open: function (app, page) {
-      if (dirty() && !window.confirm('Discard the layout changes that are not applied?')) return false;
+    open: function (app, page, confirmed) {
+      if (dirty() && !confirmed) {
+        VD.ask('Discard the layout changes that are not applied?', { ok: 'Discard' }).then(function (ok) {
+          if (ok) VD.app.openPage(app, page, true);
+        });
+        return false;
+      }
       attach(app, page);
       return true;
     },
     // false keeps the board open: the user cancelled, or chose Apply (then onLeave runs after it).
     leave: function (onLeave) {
       if (!dirty()) return true;
-      if (window.confirm('The layout has changes that are not applied. Apply them now?\n\nOK applies them; Cancel lets you discard them or stay.')) {
-        apply(onLeave);
-        return false;
-      }
-      if (window.confirm('Discard the layout changes that are not applied?')) { revert(); return true; }
+      VD.ask('The layout has changes that are not applied. Apply them now?\n\nOK applies them; Cancel lets you discard them or stay.').then(function (ok) {
+        if (ok) { apply(onLeave); return; }
+        VD.ask('Discard the layout changes that are not applied?', { ok: 'Discard' }).then(function (discard) {
+          if (!discard) return;
+          revert();
+          onLeave();
+        });
+      });
       return false;
     },
     attach: attach

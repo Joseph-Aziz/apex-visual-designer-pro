@@ -172,3 +172,36 @@ console.log('flutter_codegen_test echarts: OK');
   assert.deepStrictEqual(calls, ['sales'], 'applied after loading');
 }
 console.log('flutter_codegen_test chart configs: OK');
+
+// Same design, different settings: one block of rules with CSS variables, each component sets
+// only the settings that differ, and the rules name the components once through :is().
+{
+  const comps = [];
+  for (let i = 0; i < 12; i++) comps.push(item('P4_T' + i, 'NATIVE_TEXT_FIELD', 'v1', { radius: 4 + i, accent: '#1a73e' + (i % 10) }));
+  const many = G.generate(design(comps)).css;
+  const one = G.generate(design([comps[0]])).css;
+  assert.strictEqual(many.split('/* text ').length - 1, 1, 'one shared block');
+  assert.ok(many.includes('#P4_T3_CONTAINER { --vd-text-v1-accent: #1a73e3 !important; --vd-text-v1-radius: 7 !important; }'), 'per-component variables');
+  assert.ok(many.includes('calc(var(--vd-text-v1-radius) * 1px)'), 'numeric setting keeps its unit');
+  assert.ok(many.includes('body :is(#P4_T0_CONTAINER, #P4_T1_CONTAINER'), 'group named once');
+  assert.ok(!many.includes('--vd-text-v1-bg'), 'a setting equal in all components stays literal');
+  assert.ok(many.length < one.length * 3, 'twelve components cost less than three copies: ' + many.length);
+  // A single component keeps the plain rules.
+  assert.ok(!one.includes('var(--vd-'), 'no variables for one component');
+}
+console.log('flutter_codegen_test shared variables: OK');
+
+// ---- date picker: previous and next day arrows ----
+(function () {
+  var G = window.VD.flutterCodegen;
+  function comp(name, vals) { return { key: "item:" + name, kind: 'item', name: name, type: 'NATIVE_DATE_PICKER_APEX', variant: 'v2', values: vals }; }
+  var off = G.generate({ app: 1, page: 4, components: [comp('P4_D1', {})] });
+  if (/vd-fl-step/.test(off.css + off.js)) throw new Error('date arrows: present although not chosen');
+  var on = G.generate({ app: 1, page: 4, components: [comp('P4_D1', { stepArrows: 'on' }), comp('P4_D2', {})] });
+  if (on.js.indexOf('["P4_D1"]') < 0) throw new Error('date arrows: script does not list P4_D1');
+  if (on.js.indexOf('P4_D2"') >= 0 && on.js.indexOf('["P4_D1","P4_D2"]') >= 0) throw new Error('date arrows: P4_D2 listed');
+  if (on.css.indexOf('.vd-fl-step') < 0) throw new Error('date arrows: CSS missing');
+  if (on.stepJs !== G.stepJs(['P4_D1'])) throw new Error('date arrows: stepJs not returned');
+  new Function(on.js); // parses
+  console.log('ok date arrows');
+})();

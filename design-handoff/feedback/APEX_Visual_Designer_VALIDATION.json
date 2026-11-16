@@ -1,0 +1,113 @@
+{
+  "project": "APEX Visual Designer UX refinement",
+  "baseline": "The supplied static redesign package apex-visual-designer-ux-restructured.zip",
+  "files": {
+    "1-design-items.html": {
+      "original_hook_attributes_preserved": true,
+      "duplicate_ids": [],
+      "controls_original": {
+        "button": 34,
+        "input": 8,
+        "select": 0,
+        "textarea": 0
+      },
+      "controls_current": {
+        "button": 34,
+        "input": 8,
+        "select": 0,
+        "textarea": 0
+      },
+      "active_workspace": [
+        "view-flutter"
+      ],
+      "skip_link": true,
+      "real_changed_comments": 12
+    },
+    "2-theme-designer.html": {
+      "original_hook_attributes_preserved": true,
+      "duplicate_ids": [],
+      "controls_original": {
+        "button": 57,
+        "input": 10,
+        "select": 1,
+        "textarea": 0
+      },
+      "controls_current": {
+        "button": 57,
+        "input": 10,
+        "select": 1,
+        "textarea": 0
+      },
+      "active_workspace": [
+        "view-theme"
+      ],
+      "skip_link": true,
+      "real_changed_comments": 14
+    },
+    "3-layout.html": {
+      "original_hook_attributes_preserved": true,
+      "duplicate_ids": [],
+      "controls_original": {
+        "button": 61,
+        "input": 11,
+        "select": 2,
+        "textarea": 0
+      },
+      "controls_current": {
+        "button": 61,
+        "input": 11,
+        "select": 2,
+        "textarea": 0
+      },
+      "active_workspace": [
+        "view-layout"
+      ],
+      "skip_link": true,
+      "real_changed_comments": 16
+    },
+    "4-theme-styles.html": {
+      "original_hook_attributes_preserved": true,
+      "duplicate_ids": [],
+      "controls_original": {
+        "button": 62,
+        "input": 11,
+        "select": 2,
+        "textarea": 0
+      },
+      "controls_current": {
+        "button": 62,
+        "input": 11,
+        "select": 2,
+        "textarea": 0
+      },
+      "active_workspace": [
+        "view-saved"
+      ],
+      "skip_link": true,
+      "real_changed_comments": 16
+    }
+  },
+  "checks": {
+    "css_top_level_parse_errors": 0,
+    "css_declaration_parse_errors": 0,
+    "legacy_physical_direction_properties_in_css": {
+      "margin-left": 0,
+      "margin-right": 0,
+      "padding-left": 0,
+      "padding-right": 0,
+      "left": 0,
+      "right": 0,
+      "border-left": 0,
+      "border-right": 0
+    },
+    "external_stylesheet_or_font_urls": 0,
+    "accessibility_contrast_ratios": {
+      "body_text_on_canvas": 12.1,
+      "secondary_text_on_white": 7.58,
+      "muted_text_on_white": 5.83,
+      "gold_accent_text_on_tint": 5.69,
+      "hint_text_on_hint_background": 8.45
+    },
+    "all_files_passed": true
+  }
+}

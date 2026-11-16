@@ -191,17 +191,19 @@
   }
 
   function push() {
-    if (!window.confirm('Push this theme to app ' + state.app + '? Every page will use it. Page 0 is re-imported, so signed-in users must log in again.')) return;
-    state.busy = true; renderTop(); setMessage('Pushing the theme…');
-    // The file's header names the version the database is about to give it, so it is generated
-    // after the push returns the id only for the history; the CSS itself does not depend on it.
-    var out = output('pushed ' + today());
-    VD.repository.pushTheme(state.app, state.theme, out.css, out.js).then(function (r) {
-      state.busy = false; state.savedJson = JSON.stringify(state.theme);
-      state.pushed = { theme: clone(state.theme), versionId: r.versionId };
-      setMessage('Pushed as version ' + r.versionId + '. Every page of app ' + state.app + ' now loads vd-theme.css?v=' + r.versionId + '.');
-      render(true);
-    }).catch(function (e) { state.busy = false; setMessage(e.message); renderTop(); });
+    VD.ask('Publish the theme to the whole application now?').then(function (ok) {
+      if (!ok) return;
+      state.busy = true; renderTop(); setMessage('Pushing the theme…');
+      // The file's header names the version the database is about to give it, so it is generated
+      // after the push returns the id only for the history; the CSS itself does not depend on it.
+      var out = output('pushed');
+      VD.repository.pushTheme(state.app, state.theme, out.css, out.js).then(function (r) {
+        state.busy = false; state.savedJson = JSON.stringify(state.theme);
+        state.pushed = { theme: clone(state.theme), versionId: r.versionId };
+        setMessage('Pushed as version ' + r.versionId + '. Every page of app ' + state.app + ' now loads vd-theme.css?v=' + r.versionId + '.');
+        render(true);
+      }).catch(function (e) { state.busy = false; setMessage(e.message); renderTop(); });
+    });
   }
 
   function save(name, text, type) {
@@ -241,7 +243,7 @@
   }
 
   function download() {
-    var out = output('download ' + today());
+    var out = output('download');
     save('vd-theme.css', out.css, 'text/css');
     if (out.js) save('vd-theme.js', out.js, 'text/javascript');
     setMessage(out.js ? 'Downloaded vd-theme.css and vd-theme.js (ripple and fonts).' : 'Downloaded vd-theme.css.');
@@ -254,40 +256,47 @@
   }
 
   function restore(id) {
-    if (!window.confirm('Put theme version ' + id + ' back into app ' + state.app + '? Page 0 is re-imported, so signed-in users must log in again.')) return;
-    state.busy = true; renderTop(); setMessage('Restoring version ' + id + '…');
-    VD.repository.restoreTheme(state.app, id).then(function (r) {
-      state.versions = null;
-      setMessage('Version ' + id + ' is live again as version ' + r.versionId + '.');
-      return load();
-    }).catch(function (e) { state.busy = false; setMessage(e.message); renderTop(); });
+    VD.ask('Put theme version ' + id + ' back into app ' + state.app + '? Page 0 is re-imported, so signed-in users must log in again.').then(function (ok) {
+      if (!ok) return;
+      state.busy = true; renderTop(); setMessage('Restoring version ' + id + '…');
+      VD.repository.restoreTheme(state.app, id).then(function (r) {
+        state.versions = null;
+        setMessage('Version ' + id + ' is live again as version ' + r.versionId + '.');
+        return load();
+      }).catch(function (e) { state.busy = false; setMessage(e.message); renderTop(); });
+    });
   }
 
   // ------------------------------------------------------------ rendering
   function skeleton() {
     host.innerHTML =
-      '<div class="lk-top th-top"></div><div class="lk-msg th-msg" role="status"></div>' +
-      '<div class="lk-body"><aside class="lk-left th-left"></aside>' +
+      '<div class="lk-top th-top"></div>' + window.VD.hints.html('theme', 'Styles here apply to the whole app. Save draft keeps them; Publish theme makes them live.') + '<div class="lk-msg th-msg" role="status"></div>' +
+      // CHANGED: side panels get a heading above their generated content (.vd-pane-body).
+      '<div class="lk-body"><aside class="lk-left th-left" aria-label="Theme styles">' + VD.studio.paneHead('Application', 'Theme styles', 'Global settings, then the named styles of each component.') + '<div class="vd-pane-body"></div></aside>' +
       '<section class="lk-center"><div class="lk-preview th-preview"></div><div class="lk-status th-status" aria-live="polite"></div></section>' +
-      '<aside class="lk-right th-right"></aside></div><style id="th-gallery-css"></style><style id="th-thumbs-css"></style>';
+      '<aside class="lk-right th-right" aria-label="Properties">' + VD.studio.paneHead('Properties', 'Style settings', '') + '<div class="vd-pane-body"></div></aside></div><style id="th-gallery-css"></style><style id="th-thumbs-css"></style>';
+    window.VD.hints.bind(host);
   }
 
   function renderTop() {
     var top = host.querySelector('.th-top'), errs = errors(), blocked = state.busy || errs.length > 0;
     top.innerHTML =
-      '<strong class="fl-title">Theme Designer</strong>' +
+      '<span class="vd-toolbar-heading"><strong class="fl-title">Theme Lab</strong></span>' +
       '<span class="lk-state">App ' + esc(state.app) + ' · ' + (dirty() ? 'Unsaved changes' : 'Saved') +
       (state.pushed ? ' · live version ' + esc(state.pushed.versionId) : ' · not pushed yet') + '</span>' +
       '<span class="lk-spacer"></span>' +
-      '<span class="th-toggle"><button class="vd-btn vd-btn--ghost' + (state.view === 'gallery' ? ' is-active' : '') + '" data-view-mode="gallery">Gallery</button>' +
-      '<button class="vd-btn vd-btn--ghost' + (state.view === 'page' ? ' is-active' : '') + '" data-view-mode="page">Page</button></span>' +
-      (state.view === 'page' ? '<label class="lk-inline">Page <input type="number" class="th-page" value="' + esc(state.page) + '"></label><button class="vd-btn vd-btn--secondary th-open">Show</button>' : '') +
-      '<button class="vd-btn vd-btn--ghost th-history">History</button>' +
-      '<button class="vd-btn vd-btn--ghost th-export"' + (errs.length ? ' disabled' : '') + '>Export presets</button>' +
-      '<button class="vd-btn vd-btn--ghost th-import"' + (state.busy ? ' disabled' : '') + '>Import presets</button>' +
-      '<button class="vd-btn vd-btn--ghost th-download"' + (errs.length ? ' disabled' : '') + '>Download CSS</button>' +
-      '<button class="vd-btn vd-btn--secondary th-save"' + (blocked || !dirty() ? ' disabled' : '') + '>Save draft</button>' +
-      '<button class="vd-btn vd-btn--primary th-push"' + (blocked ? ' disabled' : '') + '>Push to app</button>';
+      // CHANGED: toolbar grouped as the preview mode, the More menu and the save actions.
+      '<span class="vd-toolbar-group vd-toolbar-group--view"><span class="th-toggle" role="group" aria-label="Preview"><button type="button" class="vd-btn vd-btn--ghost' + (state.view === 'gallery' ? ' is-active' : '') + '" data-view-mode="gallery" aria-pressed="' + (state.view === 'gallery') + '">Gallery</button>' +
+      '<button type="button" class="vd-btn vd-btn--ghost' + (state.view === 'page' ? ' is-active' : '') + '" data-view-mode="page" aria-pressed="' + (state.view === 'page') + '">Page</button></span>' +
+      (state.view === 'page' ? '<label class="lk-inline">Page <input type="number" class="th-page" value="' + esc(state.page) + '"></label><button type="button" class="vd-btn vd-btn--secondary th-open">Show</button>' : '') + '</span>' +
+      '<details class="vd-more"><summary class="vd-btn vd-btn--ghost">More</summary><div class="vd-more-menu">' +
+        '<button class="vd-btn vd-btn--ghost th-history" title="Earlier saved versions">History</button>' +
+        '<button class="vd-btn vd-btn--ghost th-export"' + (errs.length ? ' disabled' : '') + '>Export presets</button>' +
+        '<button class="vd-btn vd-btn--ghost th-import"' + (state.busy ? ' disabled' : '') + '>Import presets</button>' +
+        '<button class="vd-btn vd-btn--ghost th-download"' + (errs.length ? ' disabled' : '') + '>Download CSS</button>' +
+      '</div></details>' +
+      '<span class="vd-toolbar-primary"><button class="vd-btn vd-btn--secondary th-save" title="Saves the theme without changing the app"' + (blocked || !dirty() ? ' disabled' : '') + '>Save draft <span aria-hidden="true" class="vd-action-kind">DRAFT</span></button>' +
+      '<button class="vd-btn vd-btn--primary th-push" title="Applies the theme to the whole application now"' + (blocked ? ' disabled' : '') + '>Publish theme <span aria-hidden="true" class="vd-action-kind">LIVE</span></button></span>';
     top.querySelectorAll('[data-view-mode]').forEach(function (b) {
       b.addEventListener('click', function () { state.view = b.getAttribute('data-view-mode'); renderTop(); loadPreview(); });
     });
@@ -309,7 +318,7 @@
   }
 
   function renderLeft() {
-    var left = host.querySelector('.th-left');
+    var left = host.querySelector('.th-left > .vd-pane-body');
     left.innerHTML = '<button class="lk-slot' + (state.type === null ? ' is-selected' : '') + '" data-global="1"><b>Global</b><span>Page background, font, accent</span></button>' +
       groups().map(function (g) {
         return '<h3>' + g[0] + '</h3>' + g[1].map(function (type) {
@@ -375,7 +384,7 @@
 
   function renderRight() {
     renderStatus();
-    var right = host.querySelector('.th-right'), s = current();
+    var right = host.querySelector('.th-right > .vd-pane-body'), s = current();
     host.querySelector('#th-thumbs-css').textContent = '';
     if (state.versions) {
       right.innerHTML = historyHtml();
@@ -412,8 +421,10 @@
       update(e.target.checked ? setDefault(state.theme, type, i) : setStyleField(state.theme, type, i, 'isDefault', false), true);
     });
     right.querySelector('.th-remove').addEventListener('click', function () {
-      if (!window.confirm('Remove the style "' + s.name + '"? Components that use vd-' + type + '-' + s.cls + ' fall back to the default once you push.')) return;
-      state.theme = removeStyle(state.theme, type, i); state.type = null; state.index = -1; render();
+      VD.ask('Remove the style "' + s.name + '"? Components that use vd-' + type + '-' + s.cls + ' fall back to the default once you push.').then(function (ok) {
+        if (!ok) return;
+        state.theme = removeStyle(state.theme, type, i); state.type = null; state.index = -1; render();
+      });
     });
     P().bindGallery(right, {
       pick: function (id) { update(setStyleField(state.theme, type, i, 'variant', id), true); },
@@ -443,7 +454,11 @@
       // A preset saved in Design items is a newer theme draft: load it, unless that drops edits here.
       if (state.stale) {
         state.stale = false;
-        if (!dirty() || window.confirm('A preset was saved into this theme from Design items. Load the theme again? Your unsaved changes here are lost.')) { render(); load(); return; }
+        if (!dirty()) { render(); load(); return; }
+        VD.ask('A preset was saved into this theme from Design items. Load the theme again? Your unsaved changes here are lost.').then(function (ok) {
+          if (!ok) return;
+          render(); load();
+        });
       }
       render();
     },
@@ -463,16 +478,28 @@
   function renderSaved(box, r) {
     var theme = r && r.theme && r.theme.types ? r.theme : null;
     var groups = savedGroups(theme);
-    box.innerHTML = '<div class="sv-page"><h2>Saved designs</h2>' +
-      '<p class="lk-hint">Presets of app ' + esc(state.app) + ': the named styles of its theme. Copy one onto a component in Design items, ' +
-      'or link it with Theme style once the theme is pushed. Edit or remove them in the Theme Designer.</p>' +
+    // CHANGED: a mode bar like the other workspaces, and each style as a card with its real thumbnail.
+    var css = '';
+    box.innerHTML = '<div class="lk-top sv-top"><span class="vd-toolbar-heading"><strong class="fl-title">Design Library</strong></span>' +
+      '<span class="lk-state">App ' + esc(state.app) + '</span></div>' +
+      '<div class="sv-page"><h2>Theme styles</h2>' + window.VD.hints.html('saved', 'Looks you saved for reuse on any page.') +
+      '<p class="lk-hint">Theme styles of app ' + esc(state.app) + ': the named styles of its theme. Copy one onto a component in Design items, ' +
+      'or link it with Theme style once the theme is published. Edit or remove them in the Theme Designer.</p>' +
       (groups.length ? groups.map(function (g) {
         return '<h3>' + esc(g.family.plural) + '</h3><ul class="sv-list">' + g.styles.map(function (st) {
           var v = V().get(g.family.id, st.variant);
-          return '<li><b>' + esc(st.name) + '</b><span>' + esc(v ? v.label : 'unknown design ' + st.variant) +
+          var thumb = '';
+          if (v) {
+            var c = VD.flParams.card(g.family.id, 'sv-thumb-' + g.family.id + '-' + esc(st.cls), v, st.values);
+            css += c.css;
+            thumb = '<span class="fl-thumb sv-thumb" aria-hidden="true">' + c.html + '</span>';
+          }
+          return '<li class="sv-card">' + thumb + '<b>' + esc(st.name) + '</b><span>' + esc(v ? v.label : 'unknown design ' + st.variant) +
             ' · vd-' + esc(g.family.id) + '-' + esc(st.cls) + (st.isDefault ? ' · default' : '') + '</span></li>';
         }).join('') + '</ul>';
-      }).join('') : '<p class="lk-hint">No presets yet. Use "Save as preset" in Design items.</p>') + '</div>';
+      }).join('') : '<div class="lk-empty sv-empty"><p>No theme styles yet.</p><p class="lk-hint">Pick a look in Design Studio and use "Save as theme style".</p></div>') + '</div>' +
+      '<style class="sv-thumbs-css">' + css + '</style>';
+    window.VD.hints.bind(box);
   }
   VD.savedDesigns = {
     groups: savedGroups,
@@ -480,8 +507,8 @@
       var box = document.getElementById('saved-host');
       if (!box) return;
       if (state.app == null && VD.config && VD.config.app) state.app = VD.config.app;
-      if (state.app == null) { box.innerHTML = '<p class="lk-hint" style="padding:16px">Set a default target application on the Visual Designer region to see its saved designs.</p>'; return; }
-      box.innerHTML = '<p class="lk-hint" style="padding:16px">Loading the saved designs…</p>';
+      if (state.app == null) { box.innerHTML = '<p class="lk-hint" style="padding:16px">Set a default target application on the Visual Designer region to see its theme styles.</p>'; return; }
+      box.innerHTML = '<p class="lk-hint" style="padding:16px">Loading the theme styles…</p>';
       VD.repository.readTheme(state.app).then(function (r) { renderSaved(box, r); },
         function (e) { box.innerHTML = '<p class="lk-hint" style="padding:16px">' + esc(e.message) + '</p>'; });
     }

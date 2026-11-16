@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.4.0 - 2026-11-15
+
+- **Component Studio:** Design items shows every design of the selected component as a gallery of live thumbnails. Point at a card to try it on the real component in the preview; click to keep it.
+- **Component browser:** the left panel can list components by category and member (Text Field, Textarea, Number Field, Password, Select List, Popup LOV, Combobox, Checkbox, Checkbox Group, Radio Group, Static Content, Standard Region and more), each with its own sample. A member the page does not have can still be browsed.
+- **Preview width:** switch the live preview between desktop, tablet (768px) and mobile (375px).
+- **State settings:** hover, focus, disabled, read-only and error colours per design. Settings now have bounds, sections and dependencies, so a setting shows only when it applies.
+- **Presets:** **Save as preset** stores the selected design as a named style of the application's theme (a theme draft). Every page of the application can copy a preset from the gallery, and link it with **Theme style** once the theme is pushed. **Saved designs** in the rail lists them.
+- **Preset files:** **Export presets** and **Import presets** in the Theme Designer carry presets to another application. Import checks every family, design, setting and class first and refuses a bad file by name; a class that is taken is renamed, never overwritten.
+- **Smaller page CSS:** components with the same design share one block of rules. Settings that differ between them become CSS variables set per component, and the rules name the components once through `:is()`, so twelve text fields with their own colours take about 9,000 characters instead of 53,000. A design that computes with a setting keeps a copy per component.
+- **Size guard:** a save that would make the page CSS or JavaScript longer than 32,767 characters is refused before the page is touched, with the size and what to do.
+- **Status strip and quick palette** under the preview show the selected component and its design.
+- **Family files:** a new component family is one file that registers with the component registry and one name in the script list; no other file changes.
+- **APEX Creative Studio:** the editor has a new look and four workspaces in the rail: Design, Theme, Layout and Library. It has a dark graphite appearance by default and a light appearance from the top bar. The top bar shows the open page, the connection state and Help. Every id, class and data attribute that pages and tests use is kept.
+- **Right to left:** the studio follows the page's reading direction. The Layout board stays left to right.
+- **Accessibility:** text is at least 12px, text contrast is at least 4.5:1 in both appearances, controls are at least 32px, and every control shows a focus ring. Small screens stack the top bar instead of overlapping it.
+- **Fix:** pointing at a design card tries it on only when the pointer moves. Before, a gallery redrawn under a resting pointer previewed whichever card landed there and hid setting changes.
+- Pages saved and themes pushed by 1.3.0 open unchanged. A page with one component per design generates the same CSS as before.
+
 ## 1.3.0 - 2026-11-14
 
 - **Shared page bar:** open a page once (App, Page, Add application, Open page) above the views, then choose **Design items** or **Layout** in the rail. The open page is remembered after a reload. The Theme Designer hides the bar, because it works on the whole application.

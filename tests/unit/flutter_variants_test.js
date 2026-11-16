@@ -85,7 +85,7 @@ assert.ok(icoColor.includes('%23ff0000'), 'native select arrow uses the icon col
 // own Icon section for dates and lists (and nothing for plain text fields)
 const iconKeys = (t, id) => F.get(t, id).params.filter((p) => p.section === 'icon').map((p) => p.key).join();
 assert.strictEqual(iconKeys('select', 'v1'), 'iconStyle,iconSize,iconColor,iconHoverBg,iconPosition', 'select icon section');
-assert.strictEqual(iconKeys('date', 'v3'), 'iconStyle,iconSize,iconColor,iconHoverBg,iconPosition', 'date icon section');
+assert.strictEqual(iconKeys('date', 'v3'), 'iconStyle,iconSize,iconColor,iconHoverBg,iconPosition,stepArrows', 'date icon section');
 assert.strictEqual(iconKeys('text', 'v1'), '', 'text has no icon section');
 assert.strictEqual(F.get('select', 'v1').params.find((p) => p.key === 'iconStyle').options.join(), 'chevron,caret,arrow,none');
 assert.strictEqual(F.get('date', 'v1').params.find((p) => p.key === 'iconStyle').options.join(), 'calendar,event,clock,none');

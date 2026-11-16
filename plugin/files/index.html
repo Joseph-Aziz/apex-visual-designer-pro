@@ -3,20 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>APEX Visual Designer</title>
+<title>APEX Creative Studio</title>
 <meta name="description" content="Flutter-style designer for Oracle APEX pages.">
 <script>
   // The static files are cached as immutable behind the CDN, so every file is requested
   // with the build stamp the host page passes in (index.html?v=...). A new stamp means new URLs.
+  // CHANGED: the editor follows the writing direction of the APEX page that hosts it.
+  try { var hostDir = window.parent.document.documentElement.dir; if (hostDir) document.documentElement.dir = hostDir; } catch (e) { /* not same origin */ }
+  try { if (localStorage.getItem('vd-appearance') === 'light') document.documentElement.setAttribute('data-appearance', 'light'); } catch (e) { /* storage blocked */ }
   window.VD_BUILD = (location.search.match(/[?&]v=([\w.-]+)/) || [])[1] || '';
   window.vdAsset = function (path) { return path + (window.VD_BUILD ? '?v=' + window.VD_BUILD : ''); };
   document.write('<link rel="stylesheet" href="' + vdAsset('css/editor.css') + '">');
 </script>
 </head>
-<body>
+<body class="vd-screen-items">
+<a class="vd-skip-link" href="#main-workspace">Skip to workspace</a>
 
 <header class="topbar">
-  <a class="brand" href="#/flutter" aria-label="APEX Visual Designer">
+  <a class="brand" href="#/flutter" aria-label="APEX Creative Studio">
     <span class="brand-mark" aria-hidden="true">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="square">
         <path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4"/>
@@ -25,42 +29,52 @@
       </svg>
     </span>
     <span class="brand-text">
-      <span class="brand-name">APEX Visual Designer</span>
-      <span class="brand-sub">Interface tooling for Oracle APEX</span>
+      <span class="brand-name">APEX Creative Studio</span>
+      <span class="brand-sub">Visual page designer</span>
     </span>
   </a>
-
+  <!-- CHANGED: The page bar (application, page, Open page) moved into the top bar as the working context. -->
+  <div class="studio-context"><div class="lk-top page-bar" id="page-bar" aria-label="Open page"></div><span class="studio-app" hidden></span></div>
+  <!-- CHANGED: The connection state follows the real server calls (VD.repository.onStatus). -->
+  <span class="studio-status" role="status" data-state="ready"><span class="dot" aria-hidden="true"></span><span class="studio-status-text">Ready</span></span>
+  <!-- CHANGED: Appearance switch (dark Studio look or light look), kept per browser. -->
+  <button type="button" class="vd-btn vd-btn--ghost studio-appearance" aria-pressed="false" title="Switch between dark and light appearance" aria-label="Light appearance">&#9680;</button>
 </header>
 
-<div class="shell">
+<div class="shell vd-app-shell">
   <nav class="rail" aria-label="Primary">
     <div class="rail-group">
       <div class="rail-label">Design</div>
-      <button class="rail-item is-active" data-view="flutter">
-        <span class="rail-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3L5 12l3 3L20 3z"/><path d="M14 13l-6 6 3 3 6-6z"/></svg></span>
-        <span>Design items</span>
+      <button class="rail-item is-active" data-view="flutter" aria-current="page">
+        <span class="rail-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3L5 12l3 3L20 3z"/><path d="M14 13l-6 6 3 3 6-6z"/></svg></span>
+        <span>Design</span>
       </button>
       <button class="rail-item" data-view="theme">
-        <span class="rail-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 100 18c1.1 0 1.6-.9 1.2-1.8-.5-1.1.2-2.2 1.4-2.2H17a4 4 0 004-4c0-5-4-10-9-10z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10.5" cy="7" r="1.2" fill="currentColor"/><circle cx="15" cy="7.5" r="1.2" fill="currentColor"/></svg></span>
-        <span>Theme Designer</span>
+        <span class="rail-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 100 18c1.1 0 1.6-.9 1.2-1.8-.5-1.1.2-2.2 1.4-2.2H17a4 4 0 004-4c0-5-4-10-9-10z"/><circle cx="7.5" cy="11" r="1.2" fill="currentColor"/><circle cx="10.5" cy="7" r="1.2" fill="currentColor"/><circle cx="15" cy="7.5" r="1.2" fill="currentColor"/></svg></span>
+        <span>Theme</span>
       </button>
       <button class="rail-item" data-view="layout">
-        <span class="rail-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M12 9v12"/></svg></span>
+        <span class="rail-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M12 9v12"/></svg></span>
         <span>Layout</span>
       </button>
       <button class="rail-item" data-view="saved">
-        <span class="rail-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg></span>
-        <span>Saved designs</span>
+        <span class="rail-ic" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-6-4-6 4z"/></svg></span>
+        <span>Library</span>
+      </button>
+    </div>
+    <!-- CHANGED: Help shows a short guide to the open workspace and can bring closed hints back. -->
+    <div class="rail-group rail-bottom">
+      <button type="button" class="rail-item studio-help" title="How this workspace works">
+        <span class="rail-ic" aria-hidden="true">?</span><span>Help</span>
       </button>
     </div>
   </nav>
 
-  <main class="views">
-    <div class="lk-top page-bar" id="page-bar" aria-label="Open page"></div>
-    <section class="view is-active" id="view-flutter"><div class="look-host" id="flutter-host"></div></section>
-    <section class="view" id="view-theme"><div class="look-host" id="theme-host"></div></section>
-    <section class="view" id="view-layout"><div class="look-host" id="layout-host"></div></section>
-    <section class="view" id="view-saved"><div class="look-host" id="saved-host"></div></section>
+  <main class="views vd-main" id="main-workspace" tabindex="-1">
+    <section class="view is-active" id="view-flutter" aria-label="Design items workspace"><div class="look-host" id="flutter-host"></div></section>
+    <section class="view" id="view-theme" aria-label="Theme designer workspace"><div class="look-host" id="theme-host"></div></section>
+    <section class="view" id="view-layout" aria-label="Page layout workspace"><div class="look-host" id="layout-host"></div></section>
+    <section class="view" id="view-saved" aria-label="Theme styles library"><div class="look-host" id="saved-host"></div></section>
   </main>
 </div>
 

@@ -59,18 +59,24 @@
       return '<button class="fl-variant' + (chosen && opts.preset === i ? ' is-selected' : '') + '" data-preset="' + i + '">' +
         '<span class="fl-thumb">' + c.html + '</span><b>' + esc(pr.label) + '</b><span class="fl-badge fl-badge--custom">Custom</span></button>';
     }).join('');
-    var actions = (opts.canReset ? '<button type="button" class="vd-btn vd-btn--ghost" data-gallery="reset" title="Keep the design and clear its settings">Reset settings</button>' : '') +
-      (opts.canSave ? '<button type="button" class="vd-btn vd-btn--ghost" data-gallery="save">Save as preset</button>' : '');
+    // Reset is always drawn, hidden while the design has no values, so a setting change can show it in place.
+    var actions = '<button type="button" class="vd-btn vd-btn--ghost" data-gallery="reset" title="Keep the design and clear its settings"' + (opts.canReset ? '' : ' hidden') + '>Reset settings</button>' +
+      (opts.canSave ? '<button type="button" class="vd-btn vd-btn--ghost" data-gallery="save" title="Keeps this look as a named style in the theme draft, for every page">Save as theme style</button>' : '');
     return { html: '<div class="fl-gallery"><div class="fl-variants">' + t.html + presets + '</div>' +
-      (actions ? '<div class="fl-gallery-actions">' + actions + '</div>' : '') + '</div>', css: css };
+      '<div class="fl-gallery-actions">' + actions + '</div></div>', css: css };
   }
   // on: { pick(designId), preset(index), reset(), save(), tryOn(card) }; a missing handler leaves its
   // control inert. tryOn gets { variant } or { preset } while a card is pointed at or focused, null after.
   function bindGallery(root, on) {
     var tryOn = function (b, card) {
       if (!on.tryOn) return;
-      ['mouseenter', 'focus'].forEach(function (t) { b.addEventListener(t, function () { on.tryOn(card); }); });
-      ['mouseleave', 'blur'].forEach(function (t) { b.addEventListener(t, function () { on.tryOn(null); }); });
+      // The pointer must move over the card: a gallery re-rendered under a resting pointer fires
+      // mouseenter on whichever card lands there, which would preview a card nobody pointed at.
+      var over = false;
+      b.addEventListener('mousemove', function () { if (!over) { over = true; on.tryOn(card); } });
+      b.addEventListener('focus', function () { on.tryOn(card); });
+      b.addEventListener('mouseleave', function () { if (over) { over = false; on.tryOn(null); } });
+      b.addEventListener('blur', function () { on.tryOn(null); });
     };
     root.querySelectorAll('[data-variant]').forEach(function (b) {
       b.addEventListener('click', function () { if (on.pick) on.pick(b.getAttribute('data-variant')); });
@@ -214,6 +220,6 @@
     });
   }
 
-  window.VD.flParams = { esc: esc, sample: sample, thumbnails: thumbnails, gallery: gallery, memberOf: memberOf, bindGallery: bindGallery,
+  window.VD.flParams = { esc: esc, sample: sample, card: card, thumbnails: thumbnails, gallery: gallery, memberOf: memberOf, bindGallery: bindGallery,
     themeColors: themeColors, palette: palette, html: html, bind: bind };
 })();

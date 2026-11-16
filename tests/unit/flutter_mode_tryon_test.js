@@ -35,8 +35,13 @@ const card = el({ 'data-variant': 'filled' }), pre = el({ 'data-preset': '0' });
 const root = { querySelectorAll: (q) => (q === '[data-variant]' ? [card] : q === '[data-preset]' ? [pre] : []) };
 const seen = [];
 P.bindGallery(root, { tryOn: (t) => seen.push(t) });
-card.fire('mouseenter'); card.fire('mouseleave'); card.fire('focus'); card.fire('blur');
-pre.fire('mouseenter'); pre.fire('mouseleave');
+card.fire('mousemove'); card.fire('mousemove'); card.fire('mouseleave'); card.fire('focus'); card.fire('blur');
+pre.fire('mousemove'); pre.fire('mouseleave');
 assert.strictEqual(JSON.stringify(seen), JSON.stringify([{ variant: 'filled' }, null, { variant: 'filled' }, null, { preset: 0 }, null]));
+
+// A card re-rendered under a resting pointer gets mouseenter/mouseleave without movement: no try-on.
+seen.length = 0;
+card.fire('mouseenter'); card.fire('mouseleave');
+assert.strictEqual(seen.length, 0);
 
 console.log('flutter_mode_tryon_test: all passed');

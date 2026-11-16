@@ -41,7 +41,9 @@ A user the *Designer authorization* scheme admits can write JavaScript that runs
   - Static IDs must match `^[A-Za-z][A-Za-z0-9_-]{0,59}$` and be unique on the page.
   - Style class names must match `^[a-z][a-z0-9-]{0,30}$`.
 - **Page exports:** values written into page exports are quoted as PL/SQL literals.
-- **Generated CSS** is scoped to one component id (page designs) or to type and class selectors (themes). Every declaration is `!important`.
+- **Preset files** are read in the browser and checked before anything is added: the format and version, every family and design against the registry, every setting key against the design, every value against the same whitelist as the settings panel, and every class name. A file with any error adds nothing. Imported presets are unsaved theme changes; they reach the server only through **Save draft** or **Push to app**, which check them again.
+- **Family files** are code. A family is added only as a file of the plug-in, by someone who can import the plug-in; the browser cannot add one.
+- **Generated CSS** is scoped to one component id (page designs) or to type and class selectors (themes). Every declaration is `!important`. A save is refused when the page CSS or JavaScript would exceed 32,767 characters.
 
 ## External requests
 

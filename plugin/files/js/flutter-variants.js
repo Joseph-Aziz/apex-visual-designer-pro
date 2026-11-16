@@ -146,6 +146,10 @@
         ' center/contain no-repeat; mask:' + svg(ic.name, '#000') + ' center/contain no-repeat; transition:transform .2s, background-color .2s;') +
       rule(sel, ':focus-within ' + button + '::after', 'background:' + (v.iconColor || v.accent) + ';');
   }
+  // Date pickers also offer two arrow buttons that move the date one day back or forward.
+  // The buttons are added by the page script (flutter-codegen.js stepJs); the look only styles them.
+  var dateIcons = iconParams(['calendar', 'event', 'clock']).concat([
+    { key: 'stepArrows', label: 'Previous and next day arrows', kind: 'select', options: ['off', 'on'], default: '', section: 'icon' }]);
   function datePopup(sel, v) {
     return rule(sel, '.a-DatePicker-calendar .is-selected, .a-DatePicker-calendar .is-selected a', 'background:' + v.accent + '; color:#fff; border-radius:999px;') +
       rule(sel, '.a-DatePicker-calendar', 'border-radius:' + (v.radius + 4) + 'px; box-shadow:0 4px 16px rgba(0,0,0,.18);') +
@@ -417,8 +421,8 @@
 
   var LIBRARY = {
     text: fieldType('text'),
-    date: dashLook(fieldType('date', datePopup, iconParams(['calendar', 'event', 'clock'])),
-      { type: 'date', needsJs: false, css: fieldCss('dashboard', datePopup), params: dashFieldParams.concat(iconParams(['calendar', 'event', 'clock'])) }),
+    date: dashLook(fieldType('date', datePopup, dateIcons),
+      { type: 'date', needsJs: false, css: fieldCss('dashboard', datePopup), params: dashFieldParams.concat(dateIcons) }),
     select: fieldType('select', chevron, iconParams(['chevron', 'caret', 'arrow'])),
     choice: tag('choice', choice, choiceParams),
     'switch': tag('switch', sw),
@@ -584,6 +588,11 @@
   // themeMark tells the family apart from the others of its surface in the page markup.
   var FIELD = '<div class="t-Form-fieldContainer"><div class="t-Form-labelContainer"><label class="t-Form-label">Label</label></div>' +
     '<div class="t-Form-inputContainer"><input class="text_field apex-item-text" value="Text"></div></div>';
+  // The date picker of Universal Theme: the input and its calendar button inside <a-date-picker>.
+  var CAL = '<button type="button" class="a-Button a-Button--calendar" aria-label="Calendar"><span class="a-Icon icon-calendar" aria-hidden="true"></span></button>';
+  var DATE = '<div class="t-Form-fieldContainer"><div class="t-Form-labelContainer"><label class="t-Form-label">Label</label></div>' +
+    '<div class="t-Form-inputContainer"><div class="t-Form-itemWrapper"><a-date-picker class="apex-item-datepicker">' +
+    '<input class="text_field apex-item-text" value="2026-11-16">' + CAL + '</a-date-picker></div></div></div>';
   // A field sample around other input markup, for the members of a field family.
   function field(input) {
     return '<div class="t-Form-fieldContainer"><div class="t-Form-labelContainer"><label class="t-Form-label">Label</label></div>' +
@@ -612,9 +621,9 @@
       sample: FIELD, themeMark: ':has(input.text_field, textarea)',
       themeSample: '<input class="text_field apex-item-text{cls}" value="Text">' },
     { id: 'date', label: 'Date picker', plural: 'Date pickers', category: 'form', surface: 'item',
-      members: items([['NATIVE_DATE_PICKER_APEX', 'Date Picker'], ['NATIVE_DATEPICKER_APEX', 'Date Picker'], ['NATIVE_DATE_PICKER', 'Date Picker']]),
-      sample: FIELD, themeMark: ':has(.apex-item-datepicker, .a-DatePicker)',
-      themeSample: '<span class="apex-item-datepicker"><input class="text_field apex-item-text{cls}" value="2026-11-11"></span>' },
+      members: items([['NATIVE_DATE_PICKER_APEX', 'Date Picker', DATE], ['NATIVE_DATEPICKER_APEX', 'Date Picker', DATE], ['NATIVE_DATE_PICKER', 'Date Picker', DATE]]),
+      sample: DATE, themeMark: ':has(.apex-item-datepicker, .a-DatePicker)',
+      themeSample: '<div class="t-Form-itemWrapper"><a-date-picker class="apex-item-datepicker"><input class="text_field apex-item-text{cls}" value="2026-11-11">' + CAL + '</a-date-picker></div>' },
     { id: 'select', label: 'List', plural: 'Lists', category: 'form', surface: 'item',
       members: items([['NATIVE_SELECT_LIST', 'Select List', field('<select class="selectlist apex-item-select"><option>One</option></select>')],
         ['NATIVE_POPUP_LOV', 'Popup LOV', field('<input class="apex-item-text apex-item-popup-lov" value="One"><button type="button" class="a-Button a-Button--popupLOV">&#9662;</button>')],

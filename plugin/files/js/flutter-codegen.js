@@ -38,6 +38,57 @@
       '})();\n';
   }
 
+  // Date pickers with "Previous and next day arrows": a button on each side of the picker moves
+  // the date one day. Running it again (the editor preview does) removes the arrows of items no
+  // longer listed and adds the missing ones, so it never doubles them.
+  var STEP_CSS =
+    '/* vd-flutter date arrows */\n' +
+    '.vd-fl-stepper { display: flex; align-items: center; gap: 4px; }\n' +
+    '.vd-fl-stepper > a-date-picker, .vd-fl-stepper > .apex-item-datepicker { position: relative; flex: 1 1 auto; min-width: 0; }\n' +
+    '.vd-fl-step { flex: none; inline-size: 32px; block-size: 32px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: inherit; cursor: pointer; font-size: 20px; line-height: 1; }\n' +
+    '.vd-fl-step:hover { background: color-mix(in srgb, currentColor 12%, transparent); }\n' +
+    '.vd-fl-step:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }\n' +
+    '[dir="rtl"] .vd-fl-step { transform: scaleX(-1); }\n';
+  function stepJs(names) {
+    return '(function () {\n' +
+      '  var names = ' + JSON.stringify(names) + ', A = window.apex;\n' +
+      '  function pad(n) { return (n < 10 ? "0" : "") + n; }\n' +
+      '  function fmt(host) { return host.getAttribute("format") || (A && A.locale && A.locale.getDateFormat && A.locale.getDateFormat()) || "YYYY-MM-DD"; }\n' +
+      '  function shift(name, host, input, days) {\n' +
+      '    var f = fmt(host), d = null, v;\n' +
+      '    if (A && A.date && A.date.parse && input.value) { try { d = A.date.parse(input.value, f); } catch (e) { d = null; } }\n' +
+      '    if (!d && /^\d{4}-\d{2}-\d{2}/.test(input.value)) { var p = input.value.split("-"); d = new Date(+p[0], p[1] - 1, +p[2].slice(0, 2)); }\n' +
+      '    if (!d || isNaN(d)) d = new Date();\n' +
+      '    d.setDate(d.getDate() + days);\n' +
+      '    v = A && A.date && A.date.format ? A.date.format(d, f) : d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());\n' +
+      '    if (A && A.item && A.item(name).node) A.item(name).setValue(v);\n' +
+      '    else { input.value = v; input.dispatchEvent(new Event("change", { bubbles: true })); }\n' +
+      '  }\n' +
+      '  function button(label, glyph, days, name, host, input) {\n' +
+      '    var b = document.createElement("button");\n' +
+      '    b.type = "button"; b.className = "vd-fl-step"; b.textContent = glyph;\n' +
+      '    b.setAttribute("aria-label", label); b.title = label;\n' +
+      '    b.addEventListener("click", function () { if (!input.disabled && !input.readOnly) shift(name, host, input, days); });\n' +
+      '    return b;\n' +
+      '  }\n' +
+      '  document.querySelectorAll(".vd-fl-stepper").forEach(function (w) {\n' +
+      '    if (names.indexOf(w.getAttribute("data-vd-item")) >= 0) return;\n' +
+      '    w.querySelectorAll(".vd-fl-step").forEach(function (b) { b.remove(); });\n' +
+      '    w.classList.remove("vd-fl-stepper"); w.removeAttribute("data-vd-item");\n' +
+      '  });\n' +
+      '  names.forEach(function (name) {\n' +
+      '    var c = document.getElementById(name + "_CONTAINER");\n' +
+      '    var host = c && c.querySelector("a-date-picker, .apex-item-datepicker");\n' +
+      '    var input = host && (host.tagName === "INPUT" ? host : host.querySelector("input"));\n' +
+      '    if (!input || !host.parentNode || host.parentNode.classList.contains("vd-fl-stepper")) return;\n' +
+      '    var w = host.parentNode;\n' +
+      '    w.classList.add("vd-fl-stepper"); w.setAttribute("data-vd-item", name);\n' +
+      '    w.insertBefore(button("Previous day", "\u2039", -1, name, host, input), host);\n' +
+      '    w.insertBefore(button("Next day", "\u203A", 1, name, host, input), host.nextSibling);\n' +
+      '  });\n' +
+      '})();\n';
+  }
+
   // Adds one Google Fonts stylesheet link for the fonts the design uses.
   function fontJs(families) {
     var href = 'https://fonts.googleapis.com/css2?' + families.map(function (f) { return 'family=' + f + ':wght@300..700'; }).join('&') + '&display=swap';
@@ -94,9 +145,73 @@
     return d.length ? sel + ' { ' + d.join('; ') + '; }\n' : '';
   }
 
+  // A design's rules are generated once for TOKEN, then TOKEN becomes the component's selector or,
+  // for several components, one ":is(#A, #B)" list: same specificity as an id, and each rule names
+  // the group once instead of repeating every selector in the rule head per component.
+  var TOKEN = '#vd-shared-sel';
+  function shared(css, sels) {
+    if (sels.length === 1) return css.split(TOKEN).join(sels[0]);
+    var group = ':is(' + sels.join(', ') + ')';
+    // "body T a, body T b" becomes "body G :is(a, b)": the group list once per rule.
+    return css.replace(/([^{};/]+)\{/g, function (m, head) {
+      var parts = head.trim().split(/\s*,\s*/), lead = 'body ' + TOKEN + ' ';
+      if (parts.length < 2 || !parts.every(function (p) { return p.indexOf(lead) === 0 && p.indexOf(TOKEN, lead.length) < 0 && p.indexOf('::') < 0; })) return m;
+      return head.match(/^\s*/)[0] + 'body ' + group + ' :is(' + parts.map(function (p) { return p.slice(lead.length); }).join(', ') + ') {';
+    }).split(TOKEN).join(group);
+  }
+
+  // A design's rules with every setting read from a CSS variable, or null when that cannot be done.
+  // The rules are only used for a set of values when putting those values back into the variables
+  // gives exactly the CSS the design writes for them, so a design that computes with a setting
+  // (a size times two) or branches on one simply keeps its own copy per component.
+  var UNIT = /var\((--vd-[A-Za-z0-9_-]+)\)(px|%|ms|s|deg|rem|em)(?![A-Za-z0-9%])/g;
+  function varDesign(type, variant, sample) {
+    var prefix = '--vd-' + String(type).replace(/[^A-Za-z0-9_-]/g, '') + '-' + String(variant.id).replace(/[^A-Za-z0-9_-]/g, '') + '-';
+    var keys = Object.keys(sample).filter(function (k) { return /^[A-Za-z0-9_-]+$/.test(k) && sample[k] !== '' && sample[k] != null; });
+    // A setting used as a lookup key or in arithmetic cannot be a variable: it keeps its value.
+    function attempt(vars) {
+      var ph = {};
+      Object.keys(sample).forEach(function (k) { ph[k] = vars.indexOf(k) < 0 ? sample[k] : 'var(' + prefix + k + ')'; });
+      try { var r = variant.css(TOKEN, ph); } catch (e) { return null; }
+      return typeof r === 'string' && !/NaN|undefined|\[object/.test(r) ? r : null;
+    }
+    keys = keys.filter(function (k) { var r = attempt([k]); return r && r.indexOf('var(' + prefix + k + ')') >= 0; });
+    var raw = attempt(keys);
+    if (!raw) return null;
+    var css = raw.replace(UNIT, 'calc(var($1) * 1$2)');
+    var used = keys.filter(function (k) { return css.indexOf('var(' + prefix + k + ')') >= 0; });
+    if (!used.length) return null;
+    function ok(x) { return (typeof x === 'number' && isFinite(x)) || (typeof x === 'string' && !/[;{}<>\\]/.test(x)); }
+    // Puts values back into the variables, except the settings named in keep.
+    function expand(vals, keep) {
+      return css.replace(/calc\(var\((--vd-[A-Za-z0-9_-]+)\) \* 1(px|%|ms|s|deg|rem|em)\)|var\((--vd-[A-Za-z0-9_-]+)\)/g, function (m, n1, u, n2) {
+        var k = (n1 || n2).slice(prefix.length);
+        if (keep && keep.indexOf(k) >= 0) return m;
+        return n1 ? String(vals[k]) + u : String(vals[k]);
+      });
+    }
+    return {
+      matches: function (vals) {
+        if (!used.every(function (k) { return ok(vals[k]); })) return false;
+        var direct;
+        try { direct = variant.css(TOKEN, vals); } catch (e) { return false; }
+        return expand(vals) === direct;
+      },
+      // Rules for these value sets: a setting that is the same in all of them is written as is,
+      // only the ones that differ stay variables, set per component by decls.
+      build: function (list) {
+        var vary = used.filter(function (k) { return list.some(function (x) { return String(x[k]) !== String(list[0][k]); }); });
+        return {
+          css: expand(list[0], vary),
+          decls: function (vals) { return vary.map(function (k) { return prefix + k + ': ' + vals[k]; }).join('; '); }
+        };
+      }
+    };
+  }
+
   function generate(design, opts) {
     opts = opts || {};
-    var css = '', ripple = [], fonts = [], charts = '', echarts = false, applies = '', frames = '';
+    var css = '', ripple = [], steps = [], fonts = [], charts = '', echarts = false, applies = '', frames = '', groups = {}, order = [];
     (design.components || []).forEach(function (c) {
       var cfg = chartOf(c);
       if (cfg && opts.chartRuntimeUrls && opts.chartRuntimeUrls.length) {
@@ -110,12 +225,53 @@
       var type = V.typeOf(c), variant = type && V.get(type, c.variant), sel = selectorFor(c);
       if (!variant || !sel) return;
       var vals = V.values(variant, c.values);
-      css += '/* ' + type + ' ' + variant.label + ': ' + (c.name || c.staticId).replace(/\*\//g, '') + ' */\n' +
-        important(variant.css(sel, vals));
+      var gk = type + '|' + c.variant + '|' + JSON.stringify(vals);
+      if (!groups[gk]) { groups[gk] = { type: type, variant: variant, vals: vals, sels: [], names: [] }; order.push(gk); }
+      groups[gk].sels.push(sel);
+      groups[gk].names.push((c.name || c.staticId).replace(/\*\//g, ''));
       var font = V.googleFont(vals.fontFamily || variant.font);
       if (font && fonts.indexOf(font) < 0) fonts.push(font);
       if (variant.js) charts += variant.js(sel, vals, c);
       if (variant.needsJs && vals.ripple !== 'off') ripple.push(type === 'button' ? sel : sel + ' .apex-item-option label');
+      if (type === 'date' && vals.stepArrows === 'on' && c.name) steps.push(c.name);
+    });
+    // Components with the same design and settings share one block of rules: the page import takes
+    // at most 32,767 characters of CSS, and one copy per component runs out on a busy form.
+    // Components with the same design but different settings share one block too: the rules are
+    // written once with CSS variables, and each component only sets its own variable values.
+    var byDesign = {}, designOrder = [];
+    order.forEach(function (gk) {
+      var g = groups[gk], dk = g.type + '|' + g.variant.id;
+      if (!byDesign[dk]) { byDesign[dk] = []; designOrder.push(dk); }
+      byDesign[dk].push(gk);
+    });
+    var done = {};
+    designOrder.forEach(function (dk) {
+      var rest = byDesign[dk];
+      while (rest.length > 1) {
+        var first = groups[rest[0]], v = varDesign(first.type, first.variant, first.vals);
+        var fits = v ? rest.filter(function (gk) { return v.matches(groups[gk].vals); }) : [];
+        rest = rest.slice(1).filter(function (gk) { return fits.indexOf(gk) < 0; });
+        if (fits.length > 1) emit(first, v, fits);
+      }
+    });
+    function emit(first, v, fits) {
+      var sels = [], names = [], sets = '';
+      var b = v.build(fits.map(function (gk) { return groups[gk].vals; }));
+      fits.forEach(function (gk) {
+        var g = groups[gk];
+        sels = sels.concat(g.sels); names = names.concat(g.names);
+        sets += g.sels.join(', ') + ' { ' + b.decls(g.vals) + '; }\n';
+        done[gk] = true;
+      });
+      css += '/* ' + first.type + ' ' + first.variant.label + ': ' + names.join(', ') + ' */\n' +
+        important(sets + shared(b.css, sels));
+    }
+    order.forEach(function (gk) {
+      if (done[gk]) return;
+      var g = groups[gk];
+      css += '/* ' + g.type + ' ' + g.variant.label + ': ' + g.names.join(', ') + ' */\n' +
+        important(shared(g.variant.css(TOKEN, g.vals), g.sels));
     });
     // The chart runtime is loaded from the plug-in files, never pasted into the page: the page
     // import takes at most 32,767 characters of page JavaScript.
@@ -136,8 +292,9 @@
       '  })();',
       '})();', ''].join('\n') : '';
     var url = echarts && opts.echartsUrl ? echartsJs(opts.echartsUrl) : '';
-    var js = (ripple.length ? rippleJs(ripple) : '') + (fonts.length ? fontJs(fonts) : '') + url + charts + runtime;
-    return { css: (css ? BASE_CSS + css : '') + frames, js: css || applies ? js : url };
+    var step = steps.length ? stepJs(steps) : '';
+    var js = (ripple.length ? rippleJs(ripple) : '') + (fonts.length ? fontJs(fonts) : '') + step + url + charts + runtime;
+    return { css: (css ? BASE_CSS + (steps.length ? STEP_CSS : '') + css : '') + frames, js: css || applies ? js : url, stepJs: step };
   }
 
   // The page import takes at most 32,767 characters of page JavaScript (found in 1.3.0). Inline CSS
@@ -175,5 +332,5 @@
   }
 
   window.VD.flutterCodegen = { generate: generate, echartsUrl: echartsUrl, needsChartRuntime: needsChartRuntime, selectorFor: selectorFor, merge: merge, sizeError: sizeError, LIMIT: LIMIT, START: START, END: END,
-    important: important, rippleJs: rippleJs, fontJs: fontJs, BASE_CSS: BASE_CSS };
+    important: important, rippleJs: rippleJs, stepJs: stepJs, fontJs: fontJs, BASE_CSS: BASE_CSS };
 })();

@@ -55,6 +55,41 @@ Last run: 2026-11-14, APEX 26.2, an existing host application after its designer
 | C4 | A page saved with an old chart look (before 1.3.0) opens with its settings converted and "Unsaved changes" | Not run |
 | U1 | `uninstall.sql`, delete the plug-in and region, import again: the first view installs, and a page designed before still looks designed | Not run |
 
+## Component Studio (1.4.0)
+
+Run after importing 1.4.0 over 1.3.0, then again after a fresh install.
+
+| # | Check | Result |
+| --- | --- | --- |
+| S1 | Import 1.4.0 over 1.3.0: plug-in shows 1.4.0; the first view upgrades `VD_INSTALL` to 1.4.0; the iframe loads `index.html?v=1.4.0` | Not run |
+| S2 | A page saved by 1.3.0 opens with no "Unsaved changes" and Save writes the same CSS | Not run |
+| S3 | A theme pushed by 1.3.0 opens and pushes again with the same CSS | Not run |
+| S4 | Gallery: pointing at a card tries it on the preview; leaving puts the design back; clicking keeps it | Not run |
+| S5 | Browser: a category, then a member, shows its sample and the page components of that member; a missing member is browse only | Not run |
+| S6 | Preview width: Desktop, Tablet and Mobile resize the preview | Not run |
+| S7 | State settings: hover, focus, disabled, read-only and error colours show on the run page | Not run |
+| S8 | Undo and redo cover design choice, settings, reset and preset copy | Not run |
+| S9 | Save as preset: the theme draft gets the style; another page shows it in the gallery; copy applies it | Not run |
+| S10 | Push the theme, then link a preset with Theme style: the component gets the class | Not run |
+| S11 | Saved designs lists the presets by family | Not run |
+| S12 | Export presets, then Import presets into another application: same styles; a clash is renamed | Not run |
+| S13 | Import a file with a bad value, an unknown family and an unknown design: each refused by name, nothing added | Not run |
+| S14 | Size guard: a page designed past 32,767 characters of CSS or JavaScript is refused and not touched | Not run |
+| S15 | Oversized inline CSS on a scratch page (outside the designer): does the import refuse it? Record the answer | Not run |
+| K01 | Text Field: looks right, value submits, a validation error shows, a Dynamic Action refresh keeps the design | Not run |
+| K02 | Textarea: looks right, value submits, a validation error shows, a Dynamic Action refresh keeps the design | Not run |
+| K03 | Number Field: looks right, value submits, a validation error shows, a Dynamic Action refresh keeps the design | Not run |
+| K04 | Password: looks right, value submits, a validation error shows, a Dynamic Action refresh keeps the design | Not run |
+| K05 | Select List: looks right, value submits, a validation error shows, a Dynamic Action refresh keeps the design | Not run |
+| K06 | Popup LOV: looks right, value submits, a validation error shows, a Dynamic Action refresh keeps the design | Not run |
+| K07 | Combobox: looks right, value submits, a validation error shows, a Dynamic Action refresh keeps the design | Not run |
+| K08 | Checkbox: looks right, value submits, a validation error shows, a Dynamic Action refresh keeps the design | Not run |
+| K09 | Checkbox Group: looks right, value submits, a validation error shows, a Dynamic Action refresh keeps the design | Not run |
+| K10 | Radio Group: looks right, value submits, a validation error shows, a Dynamic Action refresh keeps the design | Not run |
+| K11 | Static Content: looks right, value submits, a validation error shows, a Dynamic Action refresh keeps the design | Not run |
+| K12 | Standard Region: looks right, value submits, a validation error shows, a Dynamic Action refresh keeps the design | Not run |
+| R1 | Theme Designer, Layout Board and Chart Designer: the 1.3.0 rows above pass again | Not run |
+
 ## Separate designer schema (1.0.x)
 
 Follow `docs/INSTALL.md` exactly in a workspace that has never had the designer, using a new

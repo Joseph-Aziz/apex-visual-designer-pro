@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-11-14.
+Last updated: 2026-11-15.
 
 ## Done
 
@@ -8,9 +8,14 @@ Last updated: 2026-11-14.
 - **1.1.0 (2026-11-12):** one-step install (the plug-in installs its own objects on first use) and Add application.
 - **1.2.0 (2026-11-12):** Layout Board for regions and items on the 12-column grid.
 - **1.3.0 (2026-11-14):** shared page bar, Chart Designer (Oracle JET and Apache ECharts), Dashboard looks, a theme style per component, and the fix that puts a page back when a write fails.
+- **1.4.0 (2026-11-15):** Component Studio phase 1: component registry, design gallery with try-on, component browser, preview width, state settings, presets with export and import, and the size guard.
 
 ## Next
 
+- Run the 1.4.0 checklist (`tests/INSTALL_CHECKLIST.md`), including one manual row per member.
+- Settle whether the page import limits inline CSS to 32,767 characters, as it does page JavaScript (one oversized save on a scratch page).
+- Check the Combobox, Popup LOV, Textarea, Number Field and single Checkbox selectors on a real 26.2 page.
+- Decide what "Button Group" means; it was left out of 1.4.0.
 - Finish the 1.3.0 clean install checklist (`tests/INSTALL_CHECKLIST.md`). Not yet run: C4 (old chart looks converted), U1 (uninstall and reinstall), D5 (the database suites that write a scratch page and page 0), and M1 to M6 (Layout Board on tabs, dialogs, hidden items, conflicts and undo).
 - Run the designer once on APEX 26.1. The docs claim 26.1 or later, but only 26.2 has been tested.
 
