@@ -87,6 +87,20 @@ const iconKeys = (t, id) => F.get(t, id).params.filter((p) => p.section === 'ico
 assert.strictEqual(iconKeys('select', 'v1'), 'iconStyle,iconSize,iconColor,iconHoverBg,iconPosition', 'select icon section');
 assert.strictEqual(iconKeys('date', 'v3'), 'iconStyle,iconSize,iconColor,iconHoverBg,iconPosition,stepArrows', 'date icon section');
 assert.strictEqual(iconKeys('text', 'v1'), '', 'text has no icon section');
+// date calendar arrows: own section; header is a flex row with the title centred
+{
+  const arrowKeys = F.get('date', 'v2').params.filter((p) => p.section === 'arrows').map((p) => p.key).join();
+  assert.strictEqual(arrowKeys, 'navIcon,navSize,navColor,navBg,navHoverBg,navHoverColor,navShape,navBorder', 'date arrows section');
+  const v = F.get('date', 'v2');
+  const css = v.css('#P1_D_CONTAINER', F.values(v, { stepArrows: 'on', navColor: '#ff0000', navShape: 'square', navSize: 22 }));
+  assert.ok(/\.a-DatePicker-header \{[^}]*display:flex[^}]*justify-content:space-between/.test(css), 'header flex row');
+  assert.ok(/\.a-DatePicker-selectors \{[^}]*order:1[^}]*justify-content:center/.test(css), 'title centred');
+  assert.ok(/\.a-DatePicker-next \{[^}]*order:2/.test(css), 'next at the end');
+  assert.ok(css.includes('color:#ff0000') && css.includes('border-radius:0;') && css.includes('inline-size:22px'), 'arrow settings applied');
+  assert.ok(/a-DatePicker-previous:dir\(rtl\)::after \{ transform:rotate\(-90deg\)/.test(css), 'rtl turns the glyph');
+  assert.ok(/\.vd-fl-step-next::after \{[^}]*rotate\(-90deg\)/.test(css) && css.includes('.vd-fl-step { font-size:0; }'), 'day arrows styled too');
+  assert.ok(!F.get('date', 'v2').css('#X', F.values(v, { navIcon: 'none' })).includes('a-DatePicker-previous::after'), 'none keeps APEX glyph');
+}
 assert.strictEqual(F.get('select', 'v1').params.find((p) => p.key === 'iconStyle').options.join(), 'chevron,caret,arrow,none');
 assert.strictEqual(F.get('date', 'v1').params.find((p) => p.key === 'iconStyle').options.join(), 'calendar,event,clock,none');
 const sv = F.get('select', 'v2');
@@ -320,3 +334,16 @@ bad([{ key: 'm', label: 'M', kind: 'select', options: ['a'], default: 'a' }, { k
 }
 
 console.log('flutter_variants_test: all passed');
+
+// label inside the box: label and input share one grid cell; the input makes room at the top
+{
+  ['text', 'date', 'select'].forEach((t) => F.forType(t).forEach((v) =>
+    assert.ok(v.params.some((p) => p.key === 'labelPosition'), t + v.id + ' has labelPosition')));
+  const v = F.get('text', 'v2');
+  assert.ok(!/grid-area:1 \/ 1/.test(v.css('#C', F.values(v, {}))), 'above by default');
+  const css = v.css('#C', F.values(v, { labelPosition: 'inside' }));
+  assert.ok(/body #C \.t-Form-labelContainer, body #C \.t-Form-inputContainer \{ grid-area:1 \/ 1;/.test(css), 'same cell');
+  assert.ok(/\.t-Form-labelContainer \{[^}]*pointer-events:none/.test(css), 'label lets clicks through');
+  assert.ok(/padding-block-start:\d+px; padding-block-end/.test(css), 'input room for the label');
+  console.log('label inside: ok');
+}

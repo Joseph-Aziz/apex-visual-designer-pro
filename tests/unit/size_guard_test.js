@@ -25,3 +25,13 @@ assert.ok(/sizeError\(cssCheck\.text, jsCheck\.text\)/.test(save), 'save checks 
 assert.ok(save.indexOf('sizeError') < save.indexOf('saveFlutter'), 'checked before the page is touched');
 
 console.log('size_guard_test: all passed');
+
+// The meter data: the fuller of CSS and JavaScript, amber from 80%, red over the limit.
+assert.strictEqual(G.sizeInfo('a'.repeat(100), '').level, 'ok');
+assert.strictEqual(G.sizeInfo('a'.repeat(26213), '').level, 'ok', 'just under 80%');
+assert.strictEqual(G.sizeInfo('a'.repeat(26214 + 1), '').level, 'warn', '80% reached');
+assert.strictEqual(G.sizeInfo('a'.repeat(32767), '').level, 'warn', 'at the limit still saves');
+const over = G.sizeInfo('a'.repeat(10), 'b'.repeat(33000));
+assert.ok(over.level === 'over' && over.name === 'JS' && over.used === 33000 && over.limit === 32767, 'the fuller one is shown');
+assert.ok(/sizeRefused\(tooBig\)/.test(save), 'a refused save explains the fix');
+console.log('size guard meter: passed');

@@ -428,6 +428,11 @@ async function main() {
       assert(after === beforeSave, 'the editor sent a save request despite the size guard');
       const message = await frame.textContent('.fl-msg');
       assert(message.indexOf('32,767') >= 0, 'the size guard message does not name the limit: ' + message);
+      // The refusal explains the fix in a dialog; close it so the run can continue.
+      await frame.waitForSelector('.vd-ask');
+      const help = await frame.textContent('.vd-ask-message');
+      assert(help.indexOf('preset') >= 0 && help.indexOf('Theme style') >= 0, 'the refusal does not explain presets: ' + help);
+      await frame.click('.vd-ask-cancel');
 
       // Back to a normal page for the rest of the run.
       await page.evaluate(function () { window.FakeVD.server.setOversize(false); });

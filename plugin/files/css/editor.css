@@ -805,6 +805,9 @@ a:hover{color:var(--accent-text)}
 }
 .vd-toolbar-group{gap:5px}
 .vd-toolbar-primary{gap:7px}
+.fl-size{font-size:12px;padding:3px 8px;border-radius:999px;border:1px solid var(--line-soft);color:var(--text);white-space:nowrap}
+.fl-size--warn{border-color:var(--gold);background:var(--warn-soft);color:var(--gold)}
+.fl-size--over{border-color:var(--danger);color:var(--danger)}
 .vd-toolbar-caption{color:var(--muted)}
 .vd-btn{
   min-block-size:34px;height:auto;padding-block:6px;padding-inline:12px;

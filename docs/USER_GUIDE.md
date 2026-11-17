@@ -20,9 +20,10 @@ Switching views with unsaved changes asks first: Design items offers to save, di
 ## Design items
 
 1. The left list shows the open page's regions, items and buttons, grouped by type. The centre shows the live page.
-2. Select a component in the list, or click it on the page. Clicking never runs it. **Use page** turns that off, so you can fill items and submit, for example to show a chart that needs dates.
+2. Select a component in the list, or click it on the page. Clicking never runs it. Ctrl+click (or Shift+click) more components of the same type to edit them together: a design, preset, reset or Remove design applies to all of them, and a setting changes every selected component that has the same design. **Use page** turns that off, so you can fill items and submit, for example to show a chart that needs dates.
 3. Pick one of the designs for its type, then adjust its settings:
-   - **Basic:** colours, corner radius, padding, font size and weight.
+   - **Basic:** colours, corner radius, padding, font size and weight. Text, date and list fields also have **Label position**: above the box, or inside it at the top, where it stays while you type. Use inside to line an item up with items that use the floating label template.
+   - **Arrows** (dates): the previous and next day arrows beside the field, and the month arrows of the calendar: icon, size, colour, background, hover colours, shape and border. Previous sits at the start, next at the end, the date in the middle.
    - **Icon** (dates and lists): icon style, size, colour, hover background and position.
    - **Show / hide:** hide parts that APEX draws, such as an Interactive Report's search bar or Actions button, a region's title bar, an item's label or a button's icon. This hides them on screen only; the APEX feature stays on.
    - **Advanced:** shadow, hover and focus colours, font, spacing, text case, width, alignment, animation, ripple, and extra CSS declarations.
@@ -36,7 +37,10 @@ Regions and buttons need a Static ID. When one is missing, the designer offers t
 - **Components:** the left panel switches between the page's components and a browser by category. Choose a member (for example Textarea or Popup LOV) to see its designs on its own sample, and the components of the page that are that member.
 - **Preview width:** Desktop, Tablet (768px) or Mobile (375px).
 - **Presets:** **Save as preset** asks for a name and saves the design as a named style of the application's theme, as a draft. The gallery then shows it beside the built-in designs on every page of the application; clicking it copies its design and settings onto the component. After the theme is pushed, **Theme style** can link the component to it instead. **Saved designs** in the rail lists all presets.
-- **Size limit:** a page takes at most 32,767 characters of CSS and of JavaScript. A save over that is refused; design fewer components on the page, or move repeated designs into the theme.
+- **Size limit:** a page takes at most 32,767 characters of CSS and of JavaScript. The size beside **Save to page** shows how full the page is: amber from 80%, red when over. A save over the limit is refused and the message explains the fix:
+  1. Select a component with a design you use on many items and click **Save as preset**.
+  2. Push the theme in the Theme workspace.
+  3. Choose the preset under **Theme style** on each item, then save the page again.
 
 When the application has a pushed theme, **Theme style** puts one of its named styles on the selected component.
 

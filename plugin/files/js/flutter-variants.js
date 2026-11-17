@@ -35,6 +35,18 @@
   function dashFont(css) { return function (sel, v) { return css(sel, v) + rule(sel, ', *', 'font-family:' + DASH.font + ';'); }; }
   function dashLook(list, look) { look.id = 'v7'; look.label = 'Dashboard'; look.font = 'cairo'; look.css = dashFont(look.css); list.push(look); return list; }
 
+  // Where the item label sits: above the box (default), or inside it at the top, as the theme's
+  // floating label looks once a value is typed, so items with either label template line up.
+  var LABEL_POS = { key: 'labelPosition', label: 'Label position', kind: 'select', options: ['above', 'inside'], default: '' };
+  function labelInside(sel, v, f) {
+    var size = Math.max(11, Math.round(v.fontSize * 0.75)), top = Math.max(4, Math.round(v.padding * 0.45));
+    var inset = v.padding + (v.shape === 'pill' ? 6 : 0);
+    return rule(sel, '', 'display:grid; grid-template-columns:minmax(0, 1fr); grid-template-areas:none;') +
+      rule(sel, '.t-Form-labelContainer, .t-Form-inputContainer', 'grid-area:1 / 1; position:relative; inline-size:auto; padding:0; margin:0;') +
+      rule(sel, '.t-Form-labelContainer', 'z-index:2; align-self:start; pointer-events:none; padding-block-start:' + top + 'px; padding-inline:' + inset + 'px;') +
+      rule(sel, f.label, 'position:static; transform:none; display:block; margin:0; padding:0; font-size:' + size + 'px; line-height:1.3; background:transparent;') +
+      rule(sel, f.input, 'padding-block-start:' + (top + Math.round(size * 1.3) + 4) + 'px; padding-block-end:' + Math.max(6, Math.round(v.padding * 0.6)) + 'px;');
+  }
   var fieldParams = [
     COLOR('accent', 'Focus / accent colour', '#1a73e8'),
     COLOR('bg', 'Background', '#eef1f6'),
@@ -45,7 +57,8 @@
     PX('borderWidth', 'Border width', 1),
     PX('padding', 'Padding', 14),
     PX('fontSize', 'Font size', 16),
-    p('fontWeight', 'Font weight', 'weight', 400)
+    p('fontWeight', 'Font weight', 'weight', 400),
+    LABEL_POS
   ];
 
   // ---- fields: text, date, select share the same three shapes ----------------
@@ -66,9 +79,9 @@
         // label over the input, which the new padding would make collide with the value, so
         // the label is placed above the field instead.
         // (Universal Theme 26.2 stacks both in the grid area "field"; give each its own row.)
-        rule(sel, '&.t-Form-fieldContainer--floatingLabel .t-Form-labelContainer', 'position:static; padding:0; inline-size:auto; grid-area:auto; grid-row:1; grid-column:field;') +
+        (v.labelPosition === 'inside' ? '' : rule(sel, '&.t-Form-fieldContainer--floatingLabel .t-Form-labelContainer', 'position:static; padding:0; inline-size:auto; grid-area:auto; grid-row:1; grid-column:field;') +
         rule(sel, '&.t-Form-fieldContainer--floatingLabel .t-Form-inputContainer', 'grid-area:auto; grid-row:2; grid-column:field;') +
-        rule(sel, '&.t-Form-fieldContainer--floatingLabel .t-Form-label', 'position:static; transform:none; display:block; margin:0; margin-block-end:6px; padding:0; font-size:13px; line-height:1.4; background:transparent;');
+        rule(sel, '&.t-Form-fieldContainer--floatingLabel .t-Form-label', 'position:static; transform:none; display:block; margin:0; margin-block-end:6px; padding:0; font-size:13px; line-height:1.4; background:transparent;'));
       var shapeCss;
       if (shape === 'filled') {
         shapeCss = rule(sel, input, 'background:' + v.bg + '; border:0; border-block-end:' + v.borderWidth + 'px solid ' + v.border +
@@ -94,7 +107,7 @@
         shapeCss = rule(sel, input, 'background:' + v.bg + '; border:0; border-radius:999px; box-shadow:0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);') +
           rule(sel, within(input)(':focus-within'), 'box-shadow:0 0 0 2px ' + v.accent + ', 0 2px 6px rgba(0,0,0,.12);');
       }
-      return base + shapeCss + (extra ? extra(sel, v) : '');
+      return base + shapeCss + (extra ? extra(sel, v) : '') + (v.labelPosition === 'inside' ? labelInside(sel, { fontSize: v.fontSize, padding: v.padding, shape: shape }, f) : '');
     };
   }
   // Smooth line icons (24px grid, round caps) drawn as masks, so they take the icon colour.
@@ -149,10 +162,48 @@
   // Date pickers also offer two arrow buttons that move the date one day back or forward.
   // The buttons are added by the page script (flutter-codegen.js stepJs); the look only styles them.
   var dateIcons = iconParams(['calendar', 'event', 'clock']).concat([
-    { key: 'stepArrows', label: 'Previous and next day arrows', kind: 'select', options: ['off', 'on'], default: '', section: 'icon' }]);
+    { key: 'stepArrows', label: 'Previous and next day arrows', kind: 'select', options: ['off', 'on'], default: '', section: 'icon' },
+    // Arrows: the day buttons beside the field and the month arrows of the calendar popup.
+    // Previous at the start, next at the end, the date (or month and year) in the middle.
+    { key: 'navIcon', label: 'Arrow icon', kind: 'select', options: ['chevron', 'arrow', 'caret', 'none'], default: '', section: 'arrows' },
+    { key: 'navSize', label: 'Arrow size', kind: 'px', default: '', min: 10, max: 40, section: 'arrows' },
+    { key: 'navColor', label: 'Arrow colour', kind: 'color', default: '', section: 'arrows' },
+    { key: 'navBg', label: 'Arrow background', kind: 'color', default: '', section: 'arrows' },
+    { key: 'navHoverBg', label: 'Arrow hover background', kind: 'color', default: '', section: 'arrows' },
+    { key: 'navHoverColor', label: 'Arrow hover colour', kind: 'color', default: '', section: 'arrows' },
+    { key: 'navShape', label: 'Arrow shape', kind: 'select', options: ['circle', 'rounded', 'square'], default: '', section: 'arrows' },
+    { key: 'navBorder', label: 'Arrow border colour', kind: 'color', default: '', section: 'arrows' }]);
+  // Calendar header: a flex row in the reading direction, so RTL mirrors it. The glyph is drawn
+  // pointing down and turned towards its side; in RTL the turns swap.
+  function dateNav(sel, v) {
+    var name = v.navIcon || 'chevron', size = v.navSize !== '' && v.navSize != null ? v.navSize : 18;
+    var color = v.navColor || v.icon, box = size + 14;
+    var radius = v.navShape === 'square' ? '0' : v.navShape === 'rounded' ? Math.round(box / 4) + 'px' : '999px';
+    var day = v.stepArrows === 'on', after = function (list) { return list.split(', ').map(function (s) { return s + '::after'; }).join(', '); };
+    var prev = '.a-DatePicker-previous' + (day ? ', .vd-fl-step-prev' : ''), next = '.a-DatePicker-next' + (day ? ', .vd-fl-step-next' : ''), nav = prev + ', ' + next;
+    var css = rule(sel, '.a-DatePicker-header', 'display:flex; align-items:center; justify-content:space-between; gap:8px;') +
+      rule(sel, '.a-DatePicker-previous', 'order:0; margin:0;') +
+      rule(sel, '.a-DatePicker-selectors', 'order:1; flex:1 1 auto; display:flex; justify-content:center; align-items:center; gap:6px; text-align:center;') +
+      rule(sel, '.a-DatePicker-next', 'order:2; margin:0;') +
+      rule(sel, nav, 'inline-size:' + box + 'px; block-size:' + box + 'px; min-inline-size:' + box + 'px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:' + radius +
+        '; background:' + (v.navBg || 'transparent') + '; border:' + (v.navBorder ? '1px solid ' + v.navBorder : '0') + '; box-shadow:none; color:' + color + '; transition:background-color .2s, color .2s;') +
+      rule(sel, '.a-DatePicker-previous:hover, .a-DatePicker-next:hover' + (day ? ', .vd-fl-step:hover' : ''), 'background:' + (v.navHoverBg || 'color-mix(in srgb, ' + color + ' 12%, transparent)') + ';' + (v.navHoverColor ? ' color:' + v.navHoverColor + ';' : ''));
+    if (name === 'none') return css;
+    var glyph = 'content:""; display:block; inline-size:' + size + 'px; block-size:' + size + 'px; background:currentColor; -webkit-mask:' + svg(name, '#000') +
+      ' center/contain no-repeat; mask:' + svg(name, '#000') + ' center/contain no-repeat;';
+    return css +
+      rule(sel, '.a-DatePicker-header .a-Icon, .a-DatePicker-header .fa', 'display:none;') +
+      (day ? rule(sel, '.vd-fl-step', 'font-size:0;') : '') +
+      rule(sel, after(prev), glyph + ' transform:rotate(90deg);') +
+      rule(sel, after(next), glyph + ' transform:rotate(-90deg);') +
+      // the day buttons are mirrored whole in RTL (scaleX(-1)); the popup arrows are not
+      rule(sel, '.a-DatePicker-previous:dir(rtl)::after', 'transform:rotate(-90deg);') +
+      rule(sel, '.a-DatePicker-next:dir(rtl)::after', 'transform:rotate(90deg);');
+  }
   function datePopup(sel, v) {
     return rule(sel, '.a-DatePicker-calendar .is-selected, .a-DatePicker-calendar .is-selected a', 'background:' + v.accent + '; color:#fff; border-radius:999px;') +
       rule(sel, '.a-DatePicker-calendar', 'border-radius:' + (v.radius + 4) + 'px; box-shadow:0 4px 16px rgba(0,0,0,.18);') +
+      dateNav(sel, v) +
       iconInside(sel, v, '.a-Button--calendar', 'calendar');
   }
   function chevron(sel, v) {
@@ -170,7 +221,7 @@
   var dashFieldParams = [COLOR('accent', 'Focus / accent colour', DASH.teal), COLOR('bg', 'Background', DASH.bg),
     COLOR('text', 'Text colour', DASH.text), COLOR('border', 'Border colour', DASH.border), COLOR('icon', 'Icon colour', DASH.muted),
     PX('radius', 'Corner radius', 10), PX('borderWidth', 'Border width', 1), PX('padding', 'Padding', 10), PX('fontSize', 'Font size', 14),
-    p('fontWeight', 'Font weight', 'weight', 600)];
+    p('fontWeight', 'Font weight', 'weight', 600), LABEL_POS];
   function fieldType(type, extra, icons) {
     return [['v1', 'Filled', 'filled'], ['v2', 'Outlined', 'outlined'], ['v3', 'Soft', 'soft'],
       ['v4', 'Underline', 'underline'], ['v5', 'Glass', 'glass'], ['v6', 'Pill', 'pill']].map(function (d) {

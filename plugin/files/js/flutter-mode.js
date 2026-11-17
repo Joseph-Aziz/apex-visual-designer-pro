@@ -19,6 +19,7 @@
     pageCss: '',
     pageJs: '',
     selected: null,
+    also: [],            // more components of the selected one's type, chosen with Ctrl or Shift; edits apply to all
     versions: null,
     message: '',
     busy: false,
@@ -91,6 +92,25 @@
     render(lost);
   }
 
+  // Plain click: select one component. Ctrl, Cmd or Shift: add or remove it from the selection,
+  // which keeps one type, so every setting of the panel fits every selected component.
+  function pick(key, multi) {
+    var first = state.selected && component(state.selected), c = component(key);
+    if (multi && first && c && c.ftype === first.ftype && c.ftype !== 'chart' && !c.needsStaticId && !first.needsStaticId && key !== first.key) {
+      var i = state.also.indexOf(key);
+      if (i >= 0) state.also.splice(i, 1); else state.also.push(key);
+    } else if (multi && first && key === first.key && state.also.length) {
+      state.selected = state.also.shift();
+    } else {
+      state.selected = key; state.also = [];
+    }
+    render();
+  }
+  // The components an edit applies to: the selected one first, then the others chosen with it.
+  function targets(key) {
+    var own = key === state.selected ? [key].concat(state.also) : [key];
+    return own.map(component).filter(function (c) { return c && !c.needsStaticId; });
+  }
   function hasPage() { return state.page != null; }
   function dirty() { return hasPage() && JSON.stringify(state.design) !== state.savedJson; }
   // Drops the unsaved design: the page's saved design and a fresh undo stack replace it.
@@ -168,7 +188,7 @@
     var pr = presetsFor(state.theme, c.ftype)[i];
     if (!pr) return;
     remember();
-    state.design.components = copyPreset(state.design.components, c, pr);
+    targets(c.key).forEach(function (t) { state.design.components = copyPreset(state.design.components, t, pr); });
     render();
   }
   // Save as preset: the component's design becomes a named style of the theme, saved as a draft.
@@ -235,7 +255,7 @@
   }
 
   function attach(app, page) {
-    state.app = app; state.page = page; state.selected = null; state.versions = null;
+    state.app = app; state.page = page; state.selected = null; state.also = []; state.versions = null;
     state.undo = VD.undoStack.create(100); state.lastField = null;
     setMessage('Loading page ' + app + ':' + page + '…');
     // The pushed theme feeds the Theme style picker; without one (or without access) there is no picker.
@@ -268,19 +288,33 @@
   // ------------------------------------------------------------ editing
   // A copy of the design components with page component c given design variantId (null: none).
   // values replaces its settings; without it the same design keeps them and another starts empty.
+  // Another design starts with empty settings, except Label position: it is a layout choice
+  // (the label inside the box lines items up), so it stays when the look changes.
+  function carried(prev, c, variantId) {
+    var keep = prev && prev.values && prev.values.labelPosition, v = V().get(c.ftype, variantId);
+    var has = keep && v && (v.params || []).some(function (p) { return p.key === 'labelPosition'; });
+    return has ? { labelPosition: keep } : {};
+  }
   function withChoice(components, c, variantId, values) {
     var prev = components.filter(function (x) { return x.key === c.key; })[0];
     var list = components.filter(function (x) { return x.key !== c.key; });
     if (variantId) {
       list.push({ key: c.key, kind: c.kind, name: c.name, staticId: c.staticId || null, type: c.type || null,
         component: c.component || null, variant: variantId,
-        values: values || (prev && prev.variant === variantId ? prev.values : {}) });
+        values: values || (prev && prev.variant === variantId ? prev.values : carried(prev, c, variantId)) });
     }
     return list;
   }
+  // Picking a design for several components gives each the same design and the settings of the first.
   function setVariant(key, variantId) {
     remember();
-    state.design.components = withChoice(state.design.components, component(key), variantId);
+    var list = targets(key), first = choice(key);
+    // Others copy the first one's settings only when it already has this design; otherwise each keeps its own.
+    var values = variantId && first && first.variant === variantId ? first.values : null;
+    list.forEach(function (c, i) {
+      state.design.components = withChoice(state.design.components, c, variantId,
+        i && values ? JSON.parse(JSON.stringify(values)) : undefined);
+    });
     render();
   }
   // Pointing at or focusing a gallery card shows it on the real component; null shows the design
@@ -295,9 +329,11 @@
   // Keeps the design and clears its settings, as one undo step.
   function resetValues(key) {
     var ch = choice(key);
-    if (!ch || !Object.keys(ch.values || {}).length) return;
+    if (!ch) return;
+    var list = targets(key).filter(function (c) { var x = choice(c.key); return x && x.variant === ch.variant && Object.keys(x.values || {}).length; });
+    if (!list.length) return;
     remember();
-    ch.values = {};
+    list.forEach(function (c) { var x = choice(c.key); if (x && x.variant === ch.variant) x.values = {}; });
     render();
   }
 
@@ -305,8 +341,13 @@
     var ch = choice(key);
     if (!ch) return;
     remember(key + ' ' + param);
-    ch.values = ch.values || {};
-    ch.values[param] = value;
+    // The other selected components follow when they have the same design.
+    targets(key).forEach(function (c) {
+      var x = choice(c.key);
+      if (!x || x.variant !== ch.variant) return;
+      x.values = x.values || {};
+      x.values[param] = value;
+    });
     var reset = host.querySelector('.fl-right [data-gallery="reset"]');
     if (reset) reset.hidden = false;
     applyPreview();
@@ -384,7 +425,7 @@
         // Selecting must not run the component: a button would submit or redirect the preview.
         ev.preventDefault();
         ev.stopImmediatePropagation();
-        state.selected = byId[n.id]; render(); return;
+        pick(byId[n.id], ev.ctrlKey || ev.metaKey || ev.shiftKey); return;
       }
     }
   }
@@ -434,7 +475,7 @@
       '<span class="vd-toolbar-group vd-toolbar-group--tools"><button class="vd-btn vd-btn--ghost fl-use-page" aria-pressed="' + state.usePage + '" title="Use the page in the preview: fill items and submit, for example to show a chart that needs dates. Turn off to select components again.">' +
         (state.usePage ? 'Using page: on' : 'Use page') + '</button>' +
       '<button class="vd-btn vd-btn--ghost fl-history" title="Earlier saved versions"' + (hasPage() ? '' : ' disabled') + '>History</button></span>' +
-      '<span class="vd-toolbar-primary"><button class="vd-btn vd-btn--primary fl-save" title="Writes the design into this page now. The app may ask you to log in again."' + (hasPage() && dirty() && !state.busy ? '' : ' disabled') + '>Save to page <span aria-hidden="true" class="vd-action-kind">LIVE</span></button></span>';
+      '<span class="vd-toolbar-primary">' + sizeMeterHtml() + '<button class="vd-btn vd-btn--primary fl-save" title="Writes the design into this page now. The app may ask you to log in again."' + (hasPage() && dirty() && !state.busy ? '' : ' disabled') + '>Save to page <span aria-hidden="true" class="vd-action-kind">LIVE</span></button></span>';
     top.querySelector('.fl-history').addEventListener('click', openHistory);
     top.querySelector('.fl-undo').addEventListener('click', function () { step(false); });
     top.querySelector('.fl-redo').addEventListener('click', function () { step(true); });
@@ -467,7 +508,7 @@
       return '<h3>' + esc(heading(g)) + '</h3>' + groups[g].map(function (c) {
         var blocked = !c.ftype ? 'type not supported' : '';
         var ch = choice(c.key);
-        return '<button class="lk-slot' + (state.selected === c.key ? ' is-selected' : '') + '" data-key="' + esc(c.key) + '"' +
+        return '<button class="lk-slot' + (state.selected === c.key || state.also.indexOf(c.key) >= 0 ? ' is-selected' : '') + '" data-key="' + esc(c.key) + '"' +
           (blocked ? ' disabled title="' + esc(blocked) + '"' : '') + '><b>' + esc(c.label) + '</b><span>' +
           esc(blocked || (c.needsStaticId ? 'set Static ID first' : ch && ch.chart ? 'Chart Designer' : ch ? V().get(c.ftype, ch.variant).label : 'plain')) + '</span></button>';
       }).join('');
@@ -511,7 +552,7 @@
       });
     });
     left.querySelectorAll('[data-key]').forEach(function (b) {
-      b.addEventListener('click', function () { state.selected = b.getAttribute('data-key'); render(); });
+      b.addEventListener('click', function (e) { pick(b.getAttribute('data-key'), e.ctrlKey || e.metaKey || e.shiftKey); });
     });
     var box = left.querySelector('.fl-tile-list');
     if (box) {
@@ -679,7 +720,9 @@
         host.querySelector('#fl-thumbs-css').textContent = '';
         return;
       }
-      right.innerHTML = '<h3>' + esc(c.label) + '</h3>' + themeStyleHtml(c) + t.html + params;
+      var many = state.also.length ? '<p class="lk-hint fl-multi">' + (state.also.length + 1) + ' components selected. Designs and settings apply to all of them; ' +
+        'settings change only those with the same design. Ctrl+click adds or removes one.</p>' : '<p class="lk-hint fl-multi">Ctrl+click another ' + esc(heading(c.ftype).toLowerCase()) + ' component to edit several at once.</p>';
+      right.innerHTML = '<h3>' + esc(c.label) + (state.also.length ? ' + ' + state.also.length : '') + '</h3>' + many + (state.also.length ? '' : themeStyleHtml(c)) + t.html + params;
       bindThemeStyle(right, c);
       VD.flParams.bindGallery(right, { pick: function (id) { setVariant(c.key, id); },
         preset: function (i) { usePreset(c, i); }, save: function () { savePreset(c); },
@@ -708,7 +751,7 @@
       '<div class="fl-browse-gallery">' + t.html + '</div>';
     right.querySelectorAll('[data-key]').forEach(function (b) {
       b.addEventListener('click', function () {
-        state.selected = b.getAttribute('data-key'); state.leftView = 'page'; state.browse = null; render();
+        state.selected = b.getAttribute('data-key'); state.also = []; state.leftView = 'page'; state.browse = null; render();
       });
     });
     // Browse only: the gallery's cards do nothing here.
@@ -721,7 +764,7 @@
     if (!el) return;
     var c = state.selected && component(state.selected), ch = c && choice(c.key);
     var design = ch && (ch.chart ? 'Chart Designer' : (V().get(c.ftype, ch.variant) || {}).label);
-    el.textContent = !hasPage() ? '' : c ? c.label + ' · ' + (design || 'No design') : 'No component selected';
+    el.textContent = !hasPage() ? '' : c ? c.label + (state.also.length ? ' + ' + state.also.length + ' more' : '') + ' · ' + (design || 'No design') : 'No component selected';
   }
 
   function render(reloadFrame) {
@@ -733,13 +776,34 @@
   }
 
   // ------------------------------------------------------------ save and history
+  // The page takes at most 32,767 characters of CSS and of JavaScript. This shows how full the page is
+  // before a save is refused. '' when nothing is open or the page code cannot be merged.
+  function sizeMeterHtml() {
+    if (!hasPage()) return '';
+    var out = output(), c = G().merge(state.pageCss, out.css), j = G().merge(state.pageJs, out.js);
+    if (c.error || j.error) return '';
+    var s = G().sizeInfo(c.text, j.text), n = function (x) { return String(x).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
+    var tip = 'Page ' + s.name + ': ' + n(s.used) + ' of ' + n(s.limit) + ' characters the page can take. ' +
+      (s.level === 'ok' ? '' : 'Move repeated designs into the theme as presets (see Help).');
+    return '<span class="fl-size fl-size--' + s.level + '" title="' + esc(tip) + '">' + s.name + ' ' + n(s.used) + ' / ' + n(s.limit) + '</span>';
+  }
+  // A save over the limit: say why and how to fix it. When a component with a design is selected the
+  // button saves it as a preset, the first step of moving its design into the theme.
+  function sizeRefused(message) {
+    var c = state.selected && component(state.selected), ch = c && choice(c.key);
+    var canSave = !!(ch && ch.variant);
+    setMessage(message);
+    VD.ask(message + '\n\nHow to make it fit:\n1. Save a design you use on many items as a preset (it goes into the theme).\n2. Push the theme in the Theme workspace.\n3. Choose the preset under Theme style on each item, then save again.' +
+      (canSave ? '' : '\n\nSelect a component with a design first to save it as a preset.'),
+      { ok: canSave ? 'Save selected as preset' : 'OK', cancel: 'Close' }).then(function (ok) { if (ok && canSave) savePreset(c); });
+  }
   // then: runs after a successful save (leaving the view).
   function save(then) {
     var out = output();
     var cssCheck = G().merge(state.pageCss, out.css), jsCheck = G().merge(state.pageJs, out.js);
     if (cssCheck.error || jsCheck.error) { setMessage(cssCheck.error || jsCheck.error); return; }
     var tooBig = G().sizeError(cssCheck.text, jsCheck.text);
-    if (tooBig) { setMessage(tooBig); return; }
+    if (tooBig) { sizeRefused(tooBig); return; }
     var pageText = state.page == null ? 'this page' : 'page ' + state.page;
     VD.ask('Write this design into ' + pageText + ' now? You may need to log in again.').then(function (ok) {
       if (!ok) return;

@@ -169,7 +169,7 @@
 
   // Short guides for the Help button of the rail, one per workspace.
   var GUIDES = {
-    flutter: 'Design Studio: pick a component on the left, point at a look in the gallery to try it on the page, click to keep it.\nSave to page writes the design into the live page.',
+    flutter: 'Design Studio: pick a component on the left, point at a look in the gallery to try it on the page, click to keep it.\nSave to page writes the design into the live page.\nThe size next to Save shows how full the page is. If it nears the limit, save repeated designs as presets, push the theme and link the items with Theme style.',
     theme: 'Theme Lab: choose a style category, then a look for the whole application.\nSave draft keeps it for you only. Publish theme writes it to the live application.',
     layout: 'Layout Studio: drag the boxes of the page to move them, and their edges to resize them.\nApply to page writes the new layout into the live page.',
     saved: 'Design Library: looks you saved as theme styles. Use one on any page from the Design gallery.'

@@ -43,8 +43,11 @@
   // longer listed and adds the missing ones, so it never doubles them.
   var STEP_CSS =
     '/* vd-flutter date arrows */\n' +
-    '.vd-fl-stepper { display: flex; align-items: center; gap: 4px; }\n' +
-    '.vd-fl-stepper > a-date-picker, .vd-fl-stepper > .apex-item-datepicker { position: relative; flex: 1 1 auto; min-width: 0; }\n' +
+    '.vd-fl-stepper { display: grid !important; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px; }\n' +
+    '.vd-fl-stepper > * { grid-row: 1; }\n' +
+    '.vd-fl-stepper > .vd-fl-step-prev { grid-column: 1; }\n' +
+    '.vd-fl-stepper > a-date-picker, .vd-fl-stepper > .apex-item-datepicker { grid-column: 2; position: relative; min-width: 0; width: 100%; }\n' +
+    '.vd-fl-stepper > .vd-fl-step-next { grid-column: 3; }\n' +
     '.vd-fl-step { flex: none; inline-size: 32px; block-size: 32px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: inherit; cursor: pointer; font-size: 20px; line-height: 1; }\n' +
     '.vd-fl-step:hover { background: color-mix(in srgb, currentColor 12%, transparent); }\n' +
     '.vd-fl-step:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }\n' +
@@ -66,7 +69,7 @@
       '  }\n' +
       '  function button(label, glyph, days, name, host, input) {\n' +
       '    var b = document.createElement("button");\n' +
-      '    b.type = "button"; b.className = "vd-fl-step"; b.textContent = glyph;\n' +
+      '    b.type = "button"; b.className = "vd-fl-step vd-fl-step-" + (days < 0 ? "prev" : "next"); b.textContent = glyph;\n' +
       '    b.setAttribute("aria-label", label); b.title = label;\n' +
       '    b.addEventListener("click", function () { if (!input.disabled && !input.readOnly) shift(name, host, input, days); });\n' +
       '    return b;\n' +
@@ -309,6 +312,14 @@
       ', and a page takes at most ' + n(LIMIT) + '. Design fewer components on this page, or move repeated designs into the theme as presets.';
   }
 
+  // The fuller of the page CSS and JavaScript against the limit: { name, used, limit, level }.
+  // level: 'ok', 'warn' from 80% of the limit, 'over' above it.
+  function sizeInfo(css, js) {
+    var a = { name: 'CSS', used: (css || '').length }, b = { name: 'JS', used: (js || '').length };
+    var w = b.used > a.used ? b : a;
+    return { name: w.name, used: w.used, limit: LIMIT, level: w.used > LIMIT ? 'over' : w.used >= LIMIT * 0.8 ? 'warn' : 'ok' };
+  }
+
   function count(text, s) { return text.split(s).length - 1; }
 
   function merge(existing, block) {
@@ -331,6 +342,6 @@
     return { text: text.slice(0, a) + text.slice(b) };
   }
 
-  window.VD.flutterCodegen = { generate: generate, echartsUrl: echartsUrl, needsChartRuntime: needsChartRuntime, selectorFor: selectorFor, merge: merge, sizeError: sizeError, LIMIT: LIMIT, START: START, END: END,
+  window.VD.flutterCodegen = { generate: generate, echartsUrl: echartsUrl, needsChartRuntime: needsChartRuntime, selectorFor: selectorFor, merge: merge, sizeError: sizeError, sizeInfo: sizeInfo, LIMIT: LIMIT, START: START, END: END,
     important: important, rippleJs: rippleJs, stepJs: stepJs, fontJs: fontJs, BASE_CSS: BASE_CSS };
 })();

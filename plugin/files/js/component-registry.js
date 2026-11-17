@@ -18,7 +18,7 @@
     ['region', 'Regions'], ['report', 'Reports']];
   var KINDS = ['item', 'button', 'region'];
   var SETTING_KINDS = ['color', 'px', 'number', 'weight', 'select', 'css', 'icon'];
-  var SECTIONS = ['basic', 'icon', 'hide', 'state', 'advanced'];
+  var SECTIONS = ['basic', 'icon', 'arrows', 'hide', 'state', 'advanced'];
   var STATES = ['normal', 'hover', 'focus', 'disabled', 'readonly', 'error'];
   var ID = /^[a-z][a-z0-9-]{0,30}$/;
 
