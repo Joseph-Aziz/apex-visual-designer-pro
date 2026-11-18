@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.5.0 - 2026-11-18
+
+- **Page backups:** before the designer replaces a page, it keeps the page's export in the new table `VD_PAGE_BACKUPS` (the last 5 per page). If the import fails, the old page is put back automatically, and a put-back that fails too is reported by name. `PKG_VD_PAGE_WRITER.restore_backup(app, page)` brings back the newest backup; it refuses the designer's own page like the other page writers.
+- **Multi-select:** Ctrl or Shift click selects several components of one type in Design items. Designs, presets, reset and settings apply to all of them. Changing a setting gives the others the first item's design and values.
+- **Apply to all N:** copies the selected design to every similar component on the page.
+- **Label position:** text, date and list fields can show the label above or inside the field. The choice stays when another design is picked.
+- **Date arrows:** a new Arrows section for date fields sets the day-step and calendar arrows (icon, size, colour, shape and border). Previous sits at the start and next at the end.
+- **Size meter:** a meter beside **Save to page** shows how close the page CSS and JavaScript are to the limit. The refusal dialog explains how to move repeated designs into the theme as presets.
+- **Clearer settings:** the panel hides settings a field design never reads, for example Radius on Soft, Underline and Pill. The date popup keeps Radius.
+- **Generated CSS** uses nesting. The plug-in files version is a content hash, so browsers reload the files only when they change.
+- **Fix:** date gallery cards are no longer buttons inside buttons.
+- **Fix:** on the Layout Board, the resize handle of a nested box stays clickable.
+- **Upgrade:** import the new plug-in export over the old one; the next view of a designer page creates `VD_PAGE_BACKUPS` and updates the packages. A separate designer schema (`database/install.sql`) runs `database/tables/vd_page_backups.sql` and the package scripts again instead.
+
 ## 1.4.0 - 2026-11-15
 
 - **Component Studio:** Design items shows every design of the selected component as a gallery of live thumbnails. Point at a card to try it on the real component in the preview; click to keep it.

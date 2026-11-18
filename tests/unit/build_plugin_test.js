@@ -57,7 +57,7 @@ assert.ok(install.includes(MARK), 'statement marker');
 assert.ok(!/^\/\s*$/m.test(install), 'no SQL*Plus slash lines');
 assert.ok(install.includes('CREATE OR REPLACE PACKAGE BODY PKG_VD_PLUGIN'), 'plug-in package body');
 const chunks = install.split(MARK).filter((c) => c.trim());
-const order = ['VD_INSTALL', 'VD_TARGET_APPLICATIONS', 'VD_PAGE_CODE_VERSIONS', 'VD_THEME_VERSIONS', 'VD_LAYOUT_VERSIONS',
+const order = ['VD_INSTALL', 'VD_TARGET_APPLICATIONS', 'VD_PAGE_CODE_VERSIONS', 'VD_THEME_VERSIONS', 'VD_LAYOUT_VERSIONS', 'VD_PAGE_BACKUPS',
   'PACKAGE PKG_VD_DESIGN_API', 'PACKAGE PKG_VD_PAGE_CODE', 'PACKAGE PKG_VD_THEME', 'PACKAGE PKG_VD_PAGE_WRITER', 'PACKAGE PKG_VD_PLUGIN'];
 let at = -1;
 order.forEach((name) => { const i = install.indexOf(name); assert.ok(i > at, name + ' in install.sql order'); at = i; });
@@ -67,7 +67,7 @@ chunks.forEach((c, i) => {
   assert.ok(!/&&|^\s*(SET|PROMPT|DEFINE)\b/im.test(c), 'chunk ' + (i + 1) + ' has no SQL*Plus commands');
 });
 // one chunk per slash-terminated statement in the source scripts
-const SOURCES = ['tables/vd_install', 'tables/vd_target_applications', 'tables/vd_page_code_versions', 'tables/vd_theme_versions', 'tables/vd_layout_versions',
+const SOURCES = ['tables/vd_install', 'tables/vd_target_applications', 'tables/vd_page_code_versions', 'tables/vd_theme_versions', 'tables/vd_layout_versions', 'tables/vd_page_backups',
   'packages/pkg_vd_design_api', 'packages/pkg_vd_page_code', 'packages/pkg_vd_theme', 'packages/pkg_vd_page_writer', 'packages/pkg_vd_plugin'];
 const slashes = SOURCES.reduce((n, f) => n + (fs.readFileSync(path.join(ROOT, 'database', f + '.sql'), 'utf8').match(/^\/\s*$/gm) || []).length, 0);
 assert.strictEqual(chunks.length, slashes, 'one chunk per statement');

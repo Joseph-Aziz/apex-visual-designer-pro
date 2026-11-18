@@ -135,6 +135,14 @@ BEGIN
   &&VD_SCHEMA..PKG_VD_PAGE_WRITER.restore_backup(&&TEST_APP, &&SCRATCH_PAGE);
   ok('restore_backup brings the page back', region_seq(l_r1) IS NOT NULL);
 
+  -- Put the scratch page back to where it started (the restored backup is the page before the undo).
+  IF region_seq(l_r1) <> l_seq THEN
+    l_token := &&VD_SCHEMA..PKG_VD_PAGE_WRITER.apply_layout(&&TEST_APP, &&SCRATCH_PAGE,
+      &&VD_SCHEMA..PKG_VD_PAGE_CODE.layout_token(&&TEST_APP, &&SCRATCH_PAGE),
+      '[{"kind":"region","id":"' || l_r1 || '","slot":"BODY","parent":null,"seq":' || l_seq || '}]');
+  END IF;
+  ok('scratch page ends at its starting sequence', region_seq(l_r1) = l_seq);
+
   DBMS_OUTPUT.PUT_LINE(l_pass || ' passed, ' || l_fail || ' failed');
 END;
 /

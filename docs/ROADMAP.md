@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-11-15.
+Last updated: 2026-11-18.
 
 ## Done
 
@@ -9,6 +9,7 @@ Last updated: 2026-11-15.
 - **1.2.0 (2026-11-12):** Layout Board for regions and items on the 12-column grid.
 - **1.3.0 (2026-11-14):** shared page bar, Chart Designer (Oracle JET and Apache ECharts), Dashboard looks, a theme style per component, and the fix that puts a page back when a write fails.
 - **1.4.0 (2026-11-15):** Component Studio phase 1: component registry, design gallery with try-on, component browser, preview width, state settings, presets with export and import, and the size guard.
+- **1.5.0 (2026-11-18):** page backups with automatic put-back, multi-select and Apply to all in Design items, label position, date arrows and the size meter.
 
 ## Next
 

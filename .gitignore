@@ -2,3 +2,4 @@ node_modules/
 .superpowers/
 dist/
 tests/browser/out/
+shabab-primary.cmd
