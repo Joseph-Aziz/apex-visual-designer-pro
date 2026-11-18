@@ -1,7 +1,7 @@
 {
   "name": "APEX Visual Designer",
   "version": "1.5.0",
-  "description": "Region plug-in that gives any application a Flutter (Material 3) style designer: pick a look for each region, item and button, set an application-wide theme, and rearrange a page's layout on the 12-column grid. The generated CSS and JavaScript are saved into the page.",
+  "description": "APEX Creative Studio: a Flutter (Material 3) style visual designer for any APEX application. Style each region, item, button, report and chart in a live preview, set an application-wide theme, rearrange a page on the 12-column grid, and reuse designs as presets. The generated CSS and JavaScript are saved into the page.",
   "keywords": ["designer", "theme", "material", "css", "layout", "universal theme"],
   "homepage": "https://github.com/Joseph-Aziz/apex-visual-designer-pro",
   "bugs": {
