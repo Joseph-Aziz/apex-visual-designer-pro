@@ -1,6 +1,6 @@
 # APEX Visual Designer plug-in
 
-A native Oracle APEX region plug-in (APEX 26.1 or later) that adds APEX Creative Studio, a Flutter (Material 3)
+A native Oracle APEX region plug-in (APEX 26.1 or later) that adds APEX Creative Studio, a Material 3
 style visual designer, to any application. Add the region to a page, open any page of the application (or of
 another application in the same workspace), and work in four workspaces:
 
