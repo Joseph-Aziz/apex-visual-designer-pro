@@ -4,7 +4,13 @@
 
 1. **Import the plug-in.** Download `plugin/region_type_plugin_apex_visual_designer.sql` from this repository. In App Builder, open the application that will host the designer, go to Shared Components > Plug-ins > Import, and import the file.
 2. **Allow page edits.** In the same application, go to Shared Components > Security Attributes > Runtime API Usage and tick **Modify This Application**.
+
+   ![Runtime API Usage with Modify This Application ticked](images/runtime-api-usage.png)
+
 3. **Allow the live preview.** Under Shared Components > Security Attributes > Browser Security, set **Embed in Frames** to **Allow from same origin**. The designer shows the page in a frame; without this, the preview stays blank.
+
+   ![Embed in Frames under Browser Security](images/embed-in-frames.png)
+
 4. **Add the region.** Create a page (a blank page is enough) and add a region of type **APEX Visual Designer**. Run the page.
 
 On that first page view, the plug-in creates its tables and packages in the application's parsing schema, registers the application, and shows the designer. This takes a few seconds, once. No extra schema and no SQL scripts are needed.
