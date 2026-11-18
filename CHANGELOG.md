@@ -1,0 +1,82 @@
+# Changelog
+
+## 1.5.0 - 2026-11-18
+
+- **Page backups:** before the designer replaces a page, it keeps the page's export in the new table `VD_PAGE_BACKUPS` (the last 5 per page). If the import fails, the old page is put back automatically, and a put-back that fails too is reported by name. `PKG_VD_PAGE_WRITER.restore_backup(app, page)` brings back the newest backup; it refuses the designer's own page like the other page writers.
+- **Multi-select:** Ctrl or Shift click selects several components of one type in Design items. Designs, presets, reset and settings apply to all of them. Changing a setting gives the others the first item's design and values.
+- **Apply to all N:** copies the selected design to every similar component on the page.
+- **Label position:** text, date and list fields can show the label above or inside the field. The choice stays when another design is picked.
+- **Date arrows:** a new Arrows section for date fields sets the day-step and calendar arrows (icon, size, colour, shape and border). Previous sits at the start and next at the end.
+- **Size meter:** a meter beside **Save to page** shows how close the page CSS and JavaScript are to the limit. The refusal dialog explains how to move repeated designs into the theme as presets.
+- **Clearer settings:** the panel hides settings a field design never reads, for example Radius on Soft, Underline and Pill. The date popup keeps Radius.
+- **Generated CSS** uses nesting. The plug-in files version is a content hash, so browsers reload the files only when they change.
+- **Fix:** date gallery cards are no longer buttons inside buttons.
+- **Fix:** on the Layout Board, the resize handle of a nested box stays clickable.
+- **Upgrade:** import the new plug-in export over the old one; the next view of a designer page creates `VD_PAGE_BACKUPS` and updates the packages. A separate designer schema (`database/install.sql`) runs `database/tables/vd_page_backups.sql` and the package scripts again instead.
+
+## 1.4.0 - 2026-11-15
+
+- **Component Studio:** Design items shows every design of the selected component as a gallery of live thumbnails. Point at a card to try it on the real component in the preview; click to keep it.
+- **Component browser:** the left panel can list components by category and member (Text Field, Textarea, Number Field, Password, Select List, Popup LOV, Combobox, Checkbox, Checkbox Group, Radio Group, Static Content, Standard Region and more), each with its own sample. A member the page does not have can still be browsed.
+- **Preview width:** switch the live preview between desktop, tablet (768px) and mobile (375px).
+- **State settings:** hover, focus, disabled, read-only and error colours per design. Settings now have bounds, sections and dependencies, so a setting shows only when it applies.
+- **Presets:** **Save as preset** stores the selected design as a named style of the application's theme (a theme draft). Every page of the application can copy a preset from the gallery, and link it with **Theme style** once the theme is pushed. **Saved designs** in the rail lists them.
+- **Preset files:** **Export presets** and **Import presets** in the Theme Designer carry presets to another application. Import checks every family, design, setting and class first and refuses a bad file by name; a class that is taken is renamed, never overwritten.
+- **Smaller page CSS:** components with the same design share one block of rules. Settings that differ between them become CSS variables set per component, and the rules name the components once through `:is()`, so twelve text fields with their own colours take about 9,000 characters instead of 53,000. A design that computes with a setting keeps a copy per component.
+- **Size guard:** a save that would make the page CSS or JavaScript longer than 32,767 characters is refused before the page is touched, with the size and what to do.
+- **Status strip and quick palette** under the preview show the selected component and its design.
+- **Family files:** a new component family is one file that registers with the component registry and one name in the script list; no other file changes.
+- **APEX Creative Studio:** the editor has a new look and four workspaces in the rail: Design, Theme, Layout and Library. It has a dark graphite appearance by default and a light appearance from the top bar. The top bar shows the open page, the connection state and Help. Every id, class and data attribute that pages and tests use is kept.
+- **Right to left:** the studio follows the page's reading direction. The Layout board stays left to right.
+- **Accessibility:** text is at least 12px, text contrast is at least 4.5:1 in both appearances, controls are at least 32px, and every control shows a focus ring. Small screens stack the top bar instead of overlapping it.
+- **Fix:** pointing at a design card tries it on only when the pointer moves. Before, a gallery redrawn under a resting pointer previewed whichever card landed there and hid setting changes.
+- Pages saved and themes pushed by 1.3.0 open unchanged. A page with one component per design generates the same CSS as before.
+
+## 1.3.0 - 2026-11-14
+
+- **Shared page bar:** open a page once (App, Page, Add application, Open page) above the views, then choose **Design items** or **Layout** in the rail. The open page is remembered after a reload. The Theme Designer hides the bar, because it works on the whole application.
+- **Leaving with unsaved changes:** Design items now asks to save, discard or stay, as Layout already did.
+- **Chart Designer:** a native chart region opens a designer of its own. Pick the engine, Oracle JET or Apache ECharts (shipped with the plug-in, no CDN), then style each part: chart, series, points, axes, labels, legend, tooltip and reference lines, with Basic and Advanced settings, undo and redo, and templates such as Monthly sales and Statistics. ECharts adds gauge, waterfall and heatmap. Older chart looks are converted to Chart Designer settings when the page is opened.
+- **Dashboard looks:** a seventh look, **Dashboard**, for Region, Cards, Button, Radio group, Checkbox group and Date field, matching a hand-built statistics page (white cards, 16px corners, soft shadow, Cairo font).
+- **Theme style on a component:** Design items can put one of the pushed theme's named styles on the selected component.
+- **Page 0:** Design items accepts page 0, as the page bar and Layout already did. APEX does not run page 0 on its own, so its preview shows a message instead; its components are picked from the list.
+- **Fix:** the designer's file URLs carry the release version again (they were stuck at 1.1.0), so browsers load the new files after an upgrade.
+- **Fix:** saving a chart design no longer fails with ORA-06502. The page loads the chart runtime from the plug-in files instead of carrying it in its own JavaScript, which the page import limits to 32,767 characters.
+- **Fix:** when a page write fails after the import step, the page is put back as it was. A page is never lost.
+- **Fix:** the CSS class list is quoted when written into the page.
+
+## 1.2.0 - 2026-11-12
+
+- **Layout Board:** rearrange the open page's regions and items on APEX's 12-column grid: drag between slots and regions, start or join a row, set the column span. **Apply** writes every change in one page re-import, **Revert** discards unapplied changes, and **Undo apply** restores the layout from before the last apply (the last 10 per page are kept). Apply is refused when the page changed in App Builder since the board loaded it.
+
+## 1.1.0 - 2026-11-12
+
+- **One-step install:**
+  - Import the plug-in and add the region; nothing else is needed.
+  - On the first page view, the plug-in creates its tables and packages in the application's parsing schema and registers the application. A newer plug-in version updates them on the next view.
+  - The install guide covers only this one-step install. The separate designer schema setup is no longer documented.
+- **Add application:** the Flutter Designer can register another application of the workspace.
+- **Clearer error:** when Runtime API Usage blocks a save, the designer names the setting to change.
+
+## 1.0.2 - 2026-11-11
+
+- **Preview of other applications:** when the host application and the designed application share one session (Session Sharing set to Workspace Sharing in both authentication schemes), the live preview opens the other application's page in that session.
+
+## 1.0.1 - 2026-11-11
+
+- **Fix:** opening a page of another application in the designer no longer ends the host application session. The live preview now passes the session id only for the host application's own pages.
+- **Install:** `install.sql` skips the grants when the host schema is the designer schema.
+
+## 1.0.0 - 2026-11-11
+
+This is the first release as a native APEX region plug-in.
+
+- **Flutter Designer:** six Material 3 designs for every supported region, item and button type. Each design has Basic, Icon, Show / hide and Advanced settings. Designs are saved into the page, with history and restore.
+- **Theme Designer:**
+  - app-wide default and named styles;
+  - gallery and page preview;
+  - push to the application through one static file and a page 0 link region;
+  - history, restore and download.
+- **Database scripts:** install, host setup, target registration and uninstall, with a configurable schema name.
+
+Before 1.0.0, the designer ran as page 19 of a single pilot application. That setup is not part of this repository.

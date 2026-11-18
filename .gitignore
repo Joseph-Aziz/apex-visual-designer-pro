@@ -1,0 +1,19 @@
+node_modules/
+.superpowers/
+dist/
+tests/browser/out/
+shabab-primary.cmd
+
+# Development files: kept on the local dev branch, not published.
+CLAUDE.md
+.claude/
+design-handoff/
+docs/superpowers/
+docs/CREATIVE_STUDIO.md
+docs/CREATIVE_STUDIO_PLAN.md
+docs/DESIGN.md
+docs/ROADMAP.md
+plugin/files/
+plugin/bootstrap.sql
+tests/
+tools/
