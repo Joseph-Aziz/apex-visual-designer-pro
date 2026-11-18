@@ -242,6 +242,11 @@
     COLOR('text', 'Text colour', '#1c1b1f'), COLOR('border', 'Border colour', '#79747e'), PX('radius', 'Corner radius', 12),
     PX('gap', 'Gap between options', 8), PX('fontSize', 'Font size', 15)];
   var f = S.field;
+  // Button-style looks: hide the input and the circle or box the theme draws on label::before/::after.
+  function hideChoiceMark(sel) {
+    return rule(sel, f.optionInput, 'position:absolute; opacity:0;') +
+      rule(sel, f.optionLabel + '::before, ' + f.optionLabel + '::after', 'display:none; content:none;');
+  }
   var choice = [
     { id: 'v1', label: 'Material', needsJs: false, css: function (sel, v) {
       return rule(sel, f.optionInput, 'accent-color:' + v.accent + '; inline-size:18px; block-size:18px;') +
@@ -250,7 +255,7 @@
     } },
     { id: 'v2', label: 'Chip', needsJs: true, css: function (sel, v) {
       return rule(sel, '.apex-item-group', 'display:flex; flex-wrap:wrap; gap:' + v.gap + 'px;') +
-        rule(sel, f.optionInput, 'position:absolute; opacity:0;') +
+        hideChoiceMark(sel) +
         rule(sel, f.optionLabel, 'display:inline-block; padding-block:6px; padding-inline:14px; border:1px solid ' + v.border +
           '; border-radius:8px; color:' + v.text + '; font-size:' + v.fontSize + 'px; cursor:pointer; transition:background-color .2s; position:relative; overflow:hidden;') +
         rule(sel, '.apex-item-option input:checked + label', 'background:' + v.bg + '; border-color:' + v.accent + '; color:' + v.accent + ';') +
@@ -266,14 +271,14 @@
     { id: 'v4', label: 'Segmented', needsJs: false, css: function (sel, v) {
       return rule(sel, '.apex-item-group', 'display:inline-flex; border:1px solid ' + v.border + '; border-radius:' + v.radius + 'px; overflow:hidden;') +
         rule(sel, f.option, 'margin:0;') +
-        rule(sel, f.optionInput, 'position:absolute; opacity:0;') +
+        hideChoiceMark(sel) +
         rule(sel, f.optionLabel, 'display:block; padding-block:8px; padding-inline:16px; color:' + v.text + '; font-size:' + v.fontSize + 'px; cursor:pointer; border-inline-end:1px solid ' + v.border + '; transition:background-color .2s;') +
         rule(sel, '.apex-item-option input:checked + label', 'background:' + v.accent + '; color:#fff;') +
         rule(sel, '.apex-item-option input:focus-visible + label', 'box-shadow:inset 0 0 0 2px ' + v.accent + ';');
     } },
     { id: 'v5', label: 'Pill', needsJs: true, css: function (sel, v) {
       return rule(sel, '.apex-item-group', 'display:flex; flex-wrap:wrap; gap:' + v.gap + 'px;') +
-        rule(sel, f.optionInput, 'position:absolute; opacity:0;') +
+        hideChoiceMark(sel) +
         rule(sel, f.optionLabel, 'display:inline-block; padding-block:8px; padding-inline:18px; border-radius:999px; background:' + v.bg +
           '; color:' + v.text + '; font-size:' + v.fontSize + 'px; cursor:pointer; position:relative; overflow:hidden; transition:background-color .2s, color .2s;') +
         rule(sel, '.apex-item-option input:checked + label', 'background:' + v.accent + '; color:#fff;') +
@@ -295,7 +300,7 @@
     return rule(sel, rd + ' .apex-item-group, ' + rd + '.apex-item-group', 'display:inline-flex; gap:0; padding:3px; background:#f1f5f9; border:1px solid ' + v.border + '; border-radius:10px;') +
       rule(sel, cb + ' .apex-item-group, ' + cb + '.apex-item-group', 'display:flex; flex-wrap:wrap; gap:' + v.gap + 'px;') +
       rule(sel, f.option, 'margin:0;') +
-      rule(sel, f.optionInput, 'position:absolute; opacity:0;') +
+      hideChoiceMark(sel) +
       rule(sel, rd + ' ' + f.optionLabel, 'display:block; padding-block:6px; padding-inline:14px; border-radius:8px; color:' + v.text + '; font-size:' + v.fontSize + 'px; font-weight:700; cursor:pointer; transition:background-color .2s, color .2s;') +
       rule(sel, rd + ' .apex-item-option input:checked + label', 'background:' + v.accent + '; color:#fff;') +
       rule(sel, cb + ' ' + f.optionLabel, 'display:inline-block; padding-block:4px; padding-inline:14px; border:1px solid ' + v.border + '; border-radius:' + v.radius +

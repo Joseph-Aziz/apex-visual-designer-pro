@@ -160,12 +160,12 @@
   "sha256": "7f6ebbf3f85cfc72be9426d07228ccb6c234cc89ddcfca06309402268af18f02"
  },
  "choice/v2 defaults": {
-  "chars": 810,
-  "sha256": "192fcd9d775a3788bf195fb84f139e96004ba65967ac6777dbea4e94bcfab11d"
+  "chars": 944,
+  "sha256": "be69a0804a8061b6c423e8836173a03ac7fb7335f566c14ec70c7fbb2576f76d"
  },
  "choice/v2 all set": {
-  "chars": 1761,
-  "sha256": "3e918368f2f258ba4796cef25d9a5d4909be4a84e8de680e3917a8caea91db72"
+  "chars": 1895,
+  "sha256": "eb5de50a069af955e1a27778d5607bcd2b51d7921652d4344d765d778a700734"
  },
  "choice/v3 defaults": {
   "chars": 585,
@@ -176,20 +176,20 @@
   "sha256": "39ab3d149a05e9a47c82e897d85df1a847b4c4b203c37b289354866ffc9b555f"
  },
  "choice/v4 defaults": {
-  "chars": 803,
-  "sha256": "0a8a75f2e3d352096e0eeb4ba10cfa4445e6b89bc3df1acac41872bc5ffda56d"
+  "chars": 937,
+  "sha256": "e2c01729f998463713ff161f41f125efbc36bda1acf2b8378947bc97cb9a3075"
  },
  "choice/v4 all set": {
-  "chars": 1753,
-  "sha256": "408a8bb814d6e27406ca17a54458e64d70dd9c39d1ceb44caecf65fe637a4b00"
+  "chars": 1887,
+  "sha256": "dfa49f1e43eb51ad24086d551dd3979691baec722f1ac3b59ac1c443b3c45fad"
  },
  "choice/v5 defaults": {
-  "chars": 781,
-  "sha256": "d334286fcff962c70fe388275fe0ec1e6e64a48ac32748fe5181f0b658bdbbaf"
+  "chars": 915,
+  "sha256": "5ee3789d046fdfe9b3fd53d096e9170e411a1fc1ecd391a93794e62d9a37d741"
  },
  "choice/v5 all set": {
-  "chars": 1732,
-  "sha256": "030288f9bfc2b2cc921682ddef4dc6e06aca54ffebd3a0954f134eb32c46b4d8"
+  "chars": 1866,
+  "sha256": "489b717d27ea0735ca86647fbf3c69e5aca54e504578162d92c8fb54661de8d6"
  },
  "choice/v6 defaults": {
   "chars": 563,
@@ -200,12 +200,12 @@
   "sha256": "1329daa4939a7af06718eb8211d4d69f8f5639467618dd914866bafbb7ef892c"
  },
  "choice/v7 defaults": {
-  "chars": 1821,
-  "sha256": "4ef54a60e5e522de1cd9410e8a7479424da55d0427eabe48cd3c5f3c3d87fc4c"
+  "chars": 1955,
+  "sha256": "db9f33f23675a0342d27cf3795769e791ae8a58650d44a2f6cd8d1ea327bb95f"
  },
  "choice/v7 all set": {
-  "chars": 2770,
-  "sha256": "87121e9adf540dbb21721e225fe74c400bc91add9de3473e944528ccc97acd51"
+  "chars": 2904,
+  "sha256": "e68ed2ab5a5f9fb5070fcd90bb4dce7b65788df1fea8b3173f8e06b716b04455"
  },
  "switch/v1 defaults": {
   "chars": 643,
@@ -616,8 +616,8 @@
   "sha256": "8cf8b6fc901d25d39e3459066eb8d8ffae552fc8e20d191631923f47fef0b2d7"
  },
  "theme css": {
-  "chars": 351851,
-  "sha256": "e88b33294c8af5ed79e7065d8febe177a89d0537bf1f18fdddc8b77d5a2fdc45"
+  "chars": 352699,
+  "sha256": "8bd6c9a1a43dc72ff88097a6159c0f8a58e10669da68730b2c2cf1e6e050e0ef"
  },
  "theme js": {
   "chars": 1082,
