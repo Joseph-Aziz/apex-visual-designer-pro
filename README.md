@@ -2,11 +2,16 @@
 
 ![APEX Visual Designer](docs/images/preview.gif)
 
-A native Oracle APEX region plug-in (26.1 or later) that gives any application a Flutter (Material 3) style
-designer. Add the region to a page, open another page of a registered application, pick a design
-for each region, item and button, and save: the generated CSS and JavaScript go into that page.
-A Theme Designer sets one look for the whole application and pushes it as a single CSS file.
-A Layout Board rearranges a page's regions and items on the 12-column grid and applies the new layout in one step, with undo.
+A native Oracle APEX region plug-in (APEX 26.1 or later) that adds APEX Creative Studio, a Flutter (Material 3)
+style visual designer, to any application. Add the region to a page, open any page of the application (or of
+another application in the same workspace), and work in four workspaces:
+
+- **Design:** pick a design for each region, item, button, report and chart, tune its colours, shape and spacing
+  in a live preview, and save. The generated CSS and JavaScript go into that page, with undo, a version history
+  and an automatic page backup.
+- **Theme:** set one look for the whole application and push it as a single theme file.
+- **Layout:** move a page's regions and items on the 12-column grid and apply the new layout in one step, with undo.
+- **Library:** keep favourite designs as named presets and reuse them on every page.
 
 - Install: import the plug-in, add the region, done. Details: [docs/INSTALL.md](docs/INSTALL.md)
 - Using it: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
