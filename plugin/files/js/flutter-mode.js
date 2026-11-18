@@ -317,6 +317,24 @@
     });
     render();
   }
+  // The other page components of the same type that a design can be copied to (no charts, none needing a Static ID).
+  function similarTo(key) {
+    var c = component(key);
+    if (!c || c.ftype === 'chart') return [];
+    return state.components.filter(function (x) { return x.key !== key && x.ftype === c.ftype && !x.needsStaticId; });
+  }
+  // Copies the design and settings of one component to all similar ones as one undo step, and selects them all.
+  function applyToSimilar(key) {
+    var src = choice(key), list = similarTo(key);
+    if (!src || !src.variant || !list.length) return;
+    remember();
+    list.forEach(function (c) {
+      state.design.components = withChoice(state.design.components, c, src.variant, JSON.parse(JSON.stringify(src.values || {})));
+    });
+    state.selected = key;
+    state.also = list.map(function (c) { return c.key; });
+    render();
+  }
   // Pointing at or focusing a gallery card shows it on the real component; null shows the design
   // again. The design, undo and the saved state are untouched.
   function tryOn(c, card) {
@@ -341,13 +359,23 @@
     var ch = choice(key);
     if (!ch) return;
     remember(key + ' ' + param);
-    // The other selected components follow when they have the same design.
+    // The first one takes the value; the others with the same design only get that setting, and the
+    // rest take the first one's design and a copy of its settings.
+    ch.values = ch.values || {};
+    ch.values[param] = value;
+    var changed = false;
     targets(key).forEach(function (c) {
+      if (c.key === key) return;
       var x = choice(c.key);
-      if (!x || x.variant !== ch.variant) return;
-      x.values = x.values || {};
-      x.values[param] = value;
+      if (x && x.variant === ch.variant) {
+        x.values = x.values || {};
+        x.values[param] = value;
+        return;
+      }
+      state.design.components = withChoice(state.design.components, c, ch.variant, JSON.parse(JSON.stringify(ch.values)));
+      changed = true;
     });
+    if (changed) { render(); return; }
     var reset = host.querySelector('.fl-right [data-gallery="reset"]');
     if (reset) reset.hidden = false;
     applyPreview();
@@ -721,7 +749,9 @@
         return;
       }
       var many = state.also.length ? '<p class="lk-hint fl-multi">' + (state.also.length + 1) + ' components selected. Designs and settings apply to all of them; ' +
-        'settings change only those with the same design. Ctrl+click adds or removes one.</p>' : '<p class="lk-hint fl-multi">Ctrl+click another ' + esc(heading(c.ftype).toLowerCase()) + ' component to edit several at once.</p>';
+        'changing a setting also gives the others this component\'s design. Ctrl+click adds or removes one.</p>' : '<p class="lk-hint fl-multi">Ctrl+click another ' + esc(heading(c.ftype).toLowerCase()) + ' component to edit several at once.</p>';
+      var nSim = ch && ch.variant ? similarTo(c.key).length : 0;
+      if (nSim) many += '<button class="vd-btn vd-btn--ghost fl-apply-similar">Apply to all ' + nSim + ' ' + esc(heading(c.ftype).toLowerCase()) + ' on this page</button>';
       right.innerHTML = '<h3>' + esc(c.label) + (state.also.length ? ' + ' + state.also.length : '') + '</h3>' + many + (state.also.length ? '' : themeStyleHtml(c)) + t.html + params;
       bindThemeStyle(right, c);
       VD.flParams.bindGallery(right, { pick: function (id) { setVariant(c.key, id); },
@@ -733,6 +763,8 @@
       }
       var rm = right.querySelector('.fl-remove');
       if (rm) rm.addEventListener('click', function () { setVariant(c.key, null); });
+      var ap = right.querySelector('.fl-apply-similar');
+      if (ap) ap.addEventListener('click', function () { applyToSimilar(c.key); });
     }
     host.querySelector('#fl-thumbs-css').textContent = thumbCss;
   }
@@ -865,6 +897,11 @@
     copyPreset: copyPreset,
     withChoice: withChoice,
     memberComponents: memberComponents,
+    applyToSimilar: applyToSimilar,
+    setValue: setValue,
+    similarTo: similarTo,
+    state: state,
+    step: step,
     WIDTHS: WIDTHS,
     enter: function () {
       host = document.getElementById('flutter-host');

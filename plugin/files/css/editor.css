@@ -974,6 +974,8 @@ a:hover{color:var(--accent-text)}
 .lb-name{color:var(--text);font-weight:750}
 .lb-meta{color:var(--muted)}
 .lb-handle{min-block-size:32px;min-inline-size:32px}
+/* A box inside a region keeps its own resize handle on top of the region's handle at the shared right edge. */
+.lb-box .lb-box > .lb-handle{z-index:1}
 .lb-preview{background:var(--surface-2)}
 .lb-preview .lk-frame{min-block-size:380px}
 .lb-top .lb-apply{min-inline-size:140px}
@@ -1130,3 +1132,6 @@ input::placeholder,textarea::placeholder{color:var(--subtle)}
 }
 /* CHANGED: Phase E accessibility — targets at least 32px. */
 .vd-hint-close{min-inline-size:32px;min-block-size:32px}
+.fl-apply-similar{display:flex;width:100%;justify-content:center;margin:6px 0 12px;border:1px solid var(--line-strong);border-radius:8px}
+/* Gallery cards are div[role=button]: show keyboard focus. */
+.fl-variant:focus-visible,.th-sample:focus-visible{outline:2px solid var(--accent-strong,#315F8C);outline-offset:2px}

@@ -23,6 +23,7 @@ PROMPT Installing APEX Visual Designer into &&VD_SCHEMA for host schema &&HOST_S
 @@tables/vd_page_code_versions.sql
 @@tables/vd_theme_versions.sql
 @@tables/vd_layout_versions.sql
+@@tables/vd_page_backups.sql
 @@packages/pkg_vd_design_api.sql
 @@packages/pkg_vd_page_code.sql
 @@packages/pkg_vd_theme.sql

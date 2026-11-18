@@ -76,9 +76,14 @@ assert.strictEqual(G.generate(design([item('P201_C', 'NATIVE_TEXT_FIELD', 'v1', 
 // more specific theme selectors) cannot override the chosen design; the base block is left alone
 const strong = G.generate(design([item('P201_A', 'NATIVE_TEXT_FIELD', 'v2', { customCss: 'opacity:.9' }),
   { key: 'button:S', kind: 'button', name: 'S', staticId: 's_btn', variant: 'v6', values: {} }])).css;
-const designRules = strong.split('}').map((r) => r.trim()).filter((r) => r.includes('{') && r.startsWith('body #') || /\*\/\s*body #/.test(r));
+const designRules = strong.split('}').map((r) => r.trim()).filter((r) => {
+  const i = r.lastIndexOf('{');
+  if (i < 0) return false;
+  const head = r.slice(0, i).trim().split('\n').pop().trim();
+  return r.slice(i + 1).trim() !== '' && head.startsWith('&');
+});
 assert.ok(designRules.length > 10, 'design rules found');
-designRules.forEach((r) => r.split('{')[1].split(';').map((d) => d.trim()).filter(Boolean).forEach((d) =>
+designRules.forEach((r) => r.slice(r.lastIndexOf('{') + 1).split(';').map((d) => d.trim()).filter(Boolean).forEach((d) =>
   assert.ok(/!important$/.test(d), 'not important: ' + d)));
 assert.ok(!/!important\s*!important/.test(strong), 'no double !important');
 assert.ok(strong.includes('url("data:image/svg+xml,') || true, 'data urls untouched');
@@ -88,7 +93,7 @@ assert.ok(/mask:url\("data:image\/svg\+xml,[^"]+"\) center\/contain no-repeat !i
 
 // a saved interactive report keeps its design after the report types split
 out = G.generate(design([{ key: 'region:9', kind: 'region', staticId: 'orders', component: 'ir', type: 'NATIVE_IR', variant: 'v2', values: { hideSearch: 'hide' } }]));
-assert.ok(out.css.includes('body #orders .a-IRR'), 'ir css');
+assert.ok(out.css.includes('body #orders {') && /&\s*(:is\([^)]*)?\.a-IRR/.test(out.css), 'ir css');
 assert.ok(/display:none !important/.test(out.css), 'hide switch reaches the page css');
 
 // charts have no looks: an old v1 chart entry adds no js or css of its own
@@ -190,6 +195,23 @@ console.log('flutter_codegen_test chart configs: OK');
   assert.ok(!one.includes('var(--vd-'), 'no variables for one component');
 }
 console.log('flutter_codegen_test shared variables: OK');
+
+// The page import takes at most 32,767 characters of CSS: a design names its component once,
+// as the parent of nested rules, not once in every part of every rule.
+{
+  const one = G.generate(design([item('P4_ONE', 'NATIVE_TEXT_FIELD', 'v1')])).css;
+  assert.strictEqual(one.split('#P4_ONE_CONTAINER').length - 1, 1, 'component named once: ' + one);
+  assert.ok(one.includes('body #P4_ONE_CONTAINER {'), 'nested under the component');
+  assert.ok(/&:focus-within :is\(/.test(one), 'focus rule groups its fields');
+  const two = G.generate(design([item('P4_A', 'NATIVE_TEXT_FIELD', 'v3'), item('P4_B', 'NATIVE_TEXT_FIELD', 'v3')])).css;
+  assert.strictEqual(two.split('#P4_A_CONTAINER').length - 1, 1, 'group named once: ' + two);
+  // Every opened block is closed.
+  [one, two].forEach((c) => assert.strictEqual(c.split('{').length, c.split('}').length, 'balanced braces'));
+  // A pseudo-element cannot go inside :is(), so those rules keep one part each.
+  const date = G.generate(design([item('P4_D', 'NATIVE_DATE_PICKER_APEX', 'v7')])).css;
+  assert.ok(!/:is\([^)]*::/.test(date), 'no pseudo-element inside :is()');
+}
+console.log('flutter_codegen_test nested rules: OK');
 
 // ---- date picker: previous and next day arrows ----
 (function () {

@@ -152,15 +152,95 @@
   // for several components, one ":is(#A, #B)" list: same specificity as an id, and each rule names
   // the group once instead of repeating every selector in the rule head per component.
   var TOKEN = '#vd-shared-sel';
+  function groupOf(sels) { return sels.length === 1 ? sels[0] : ':is(' + sels.join(', ') + ')'; }
   function shared(css, sels) {
     if (sels.length === 1) return css.split(TOKEN).join(sels[0]);
-    var group = ':is(' + sels.join(', ') + ')';
+    var group = groupOf(sels);
     // "body T a, body T b" becomes "body G :is(a, b)": the group list once per rule.
     return css.replace(/([^{};/]+)\{/g, function (m, head) {
       var parts = head.trim().split(/\s*,\s*/), lead = 'body ' + TOKEN + ' ';
       if (parts.length < 2 || !parts.every(function (p) { return p.indexOf(lead) === 0 && p.indexOf(TOKEN, lead.length) < 0 && p.indexOf('::') < 0; })) return m;
       return head.match(/^\s*/)[0] + 'body ' + group + ' :is(' + parts.map(function (p) { return p.slice(lead.length); }).join(', ') + ') {';
     }).split(TOKEN).join(group);
+  }
+
+  // Splits a selector list at its top-level commas (not the ones inside :is() or quotes).
+  function splitList(head) {
+    var parts = [], depth = 0, q = '', start = 0;
+    for (var i = 0; i < head.length; i++) {
+      var ch = head[i];
+      if (q) { if (ch === '\\') i++; else if (ch === q) q = ''; continue; }
+      if (ch === '"' || ch === "'") q = ch;
+      else if (ch === '\\') i++;
+      else if (ch === '(' || ch === '[') depth++;
+      else if (ch === ')' || ch === ']') depth--;
+      else if (ch === ',' && !depth) { parts.push(head.slice(start, i).trim()); start = i + 1; }
+    }
+    parts.push(head.slice(start).trim());
+    return parts;
+  }
+
+  // The index just past the block that opens at css[open] ('{'), skipping quoted text.
+  function blockEnd(css, open) {
+    var depth = 0, q = '';
+    for (var i = open; i < css.length; i++) {
+      var ch = css[i];
+      if (q) { if (ch === '\\') i++; else if (ch === q) q = ''; continue; }
+      if (ch === '"' || ch === "'") q = ch;
+      else if (ch === '{') depth++;
+      else if (ch === '}' && --depth === 0) return i + 1;
+    }
+    return css.length;
+  }
+
+  // The nested selector for a rule head whose parts all start with lead, or null.
+  // "body S a, body S b" gives "& :is(a, b)"; "body S:focus-within a" gives "&:focus-within a".
+  function relative(head, lead) {
+    var rest = [];
+    var parts = splitList(head);
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i].indexOf(lead) !== 0) return null;
+      var r = parts[i].slice(lead.length);
+      // The id must end where lead ends: "#A_CONTAINER2" is another component.
+      if (r && !/^[\s:.\[]/.test(r)) return null;
+      rest.push(r);
+    }
+    if (rest.length > 1) {
+      // Parts that only differ after the same joint ("" or ":focus-within ") share one :is().
+      var joint = /^(\s+|[^\s]+\s+)/.exec(rest[0]);
+      joint = joint && joint[0];
+      if (joint && rest.every(function (r) { return r.indexOf(joint) === 0 && r.length > joint.length && r.indexOf('::') < 0; })) {
+        return '&' + joint.replace(/\s+$/, ' ') + ':is(' + rest.map(function (r) { return r.slice(joint.length); }).join(', ') + ')';
+      }
+    }
+    return rest.map(function (r) { return '&' + r.replace(/^\s+/, ' '); }).join(', ');
+  }
+
+  // Writes a design's rules under its component selector once, with CSS nesting:
+  // "body S a, body S b { … }" becomes "body S { & :is(a, b) { … } }". The page import takes at
+  // most 32,767 characters of CSS, and the selector repeated in every part of every rule was most of
+  // it. Only consecutive rules are nested together, so the order of the rules stays the same; at-rules,
+  // comments and rules for other selectors are written as they are.
+  function nest(css, sel) {
+    var lead = 'body ' + sel, out = '', run = '', i = 0;
+    function flush() { if (run) out += lead + ' {\n' + run + '}\n'; run = ''; }
+    while (i < css.length) {
+      var ws = /^\s*/.exec(css.slice(i))[0];
+      if (ws) { if (!run) out += ws; i += ws.length; continue; }
+      if (css.indexOf('/*', i) === i) {
+        var c = css.indexOf('*/', i); c = c < 0 ? css.length : c + 2;
+        flush(); out += css.slice(i, c) + '\n'; i = c; continue;
+      }
+      var open = css.indexOf('{', i);
+      if (open < 0) { flush(); out += css.slice(i); break; }
+      var end = blockEnd(css, open), head = css.slice(i, open).trim(), body = css.slice(open, end);
+      var rel = head.charAt(0) === '@' || body.slice(1, -1).indexOf('{') >= 0 ? null : relative(head, lead);
+      if (rel) run += '  ' + rel + ' ' + body + '\n';
+      else { flush(); out += css.slice(i, end) + '\n'; }
+      i = end;
+    }
+    flush();
+    return out;
   }
 
   // A design's rules with every setting read from a CSS variable, or null when that cannot be done.
@@ -268,13 +348,13 @@
         done[gk] = true;
       });
       css += '/* ' + first.type + ' ' + first.variant.label + ': ' + names.join(', ') + ' */\n' +
-        important(sets + shared(b.css, sels));
+        nest(important(sets + shared(b.css, sels)), groupOf(sels));
     }
     order.forEach(function (gk) {
       if (done[gk]) return;
       var g = groups[gk];
       css += '/* ' + g.type + ' ' + g.variant.label + ': ' + g.names.join(', ') + ' */\n' +
-        important(shared(g.variant.css(TOKEN, g.vals), g.sels));
+        nest(important(shared(g.variant.css(TOKEN, g.vals), g.sels)), groupOf(g.sels));
     });
     // The chart runtime is loaded from the plug-in files, never pasted into the page: the page
     // import takes at most 32,767 characters of page JavaScript.

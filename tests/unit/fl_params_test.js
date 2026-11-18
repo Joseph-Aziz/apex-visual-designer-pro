@@ -38,7 +38,7 @@ assert.ok(/<summary>States<\/summary>[\s\S]*data-param="disabledOpacity"/.test(P
 {
   const g = P.gallery('text', { current: 'v2', canReset: true });
   assert.strictEqual((g.html.match(/class="fl-badge">Built-in</g) || []).length, V.forType('text').length, 'every design has a Built-in badge');
-  assert.ok(/data-variant="v2"[^>]*>|is-selected" data-variant="v2"/.test(g.html), 'current design selected');
+  assert.ok(/is-selected" role="button" tabindex="0" data-variant="v2"/.test(g.html), 'current design selected');
   assert.ok(g.html.includes('data-gallery="reset"'), 'Reset settings shown');
   assert.ok(!g.html.includes('data-gallery="save"'), 'no Save as preset until presets exist');
   assert.ok(/data-gallery="reset"[^>]* hidden>/.test(P.gallery('text', { current: 'v2' }).html), 'reset hidden without values');
@@ -47,9 +47,22 @@ assert.ok(/<summary>States<\/summary>[\s\S]*data-param="disabledOpacity"/.test(P
     presets: [{ label: 'Brand field', variant: 'v1', values: { radius: 12 } }] });
   assert.ok(pg.html.includes('data-preset="0"') && pg.html.includes('class="fl-badge fl-badge--custom">Custom<'), 'preset card with Custom badge');
   assert.ok(pg.html.includes('data-gallery="save"'), 'Save as preset when allowed');
-  assert.ok(/is-selected" data-preset="0"/.test(pg.html) && !/is-selected" data-variant/.test(pg.html), 'the selected preset, not its design');
+  assert.ok(/is-selected" role="button" tabindex="0" data-preset="0"/.test(pg.html) && !/is-selected" role="button" tabindex="0" data-variant/.test(pg.html), 'the selected preset, not its design');
   assert.ok(pg.css.includes('#fl-preset-0'), 'preset thumbnail styled');
   assert.strictEqual(P.gallery('text', {}).html, P.gallery('text', {}).html, 'same gallery for both designers');
+}
+// ---- cards are not <button>s: the date, Popup LOV and button samples hold their own <button>
+{
+  ['date', 'button', 'text'].forEach((type) => {
+    const g = P.gallery(type, { current: 'v1', preset: 0, presets: [{ label: 'P', variant: 'v1', values: {} }] }).html;
+    assert.ok(!g.includes('<button class="fl-variant'), type + ': no button card');
+    const cards = g.match(/<div class="fl-variant[ "][^>]*>/g) || [];
+    assert.ok(cards.length >= 2, type + ': cards are divs');
+    assert.ok(cards.every((c) => /role="button" tabindex="0"/.test(c) || /tabindex="0"[^>]*role="button"|role="button"[^>]*tabindex="0"/.test(c)), type + ': cards are focusable buttons by role');
+    assert.strictEqual((g.match(/<span class="fl-thumb" inert>/g) || []).length, cards.length, type + ': every thumbnail is inert');
+  });
+  const dg = P.gallery('date', { current: 'v1' }).html;
+  assert.ok(dg.includes('a-Button--calendar'), 'date sample keeps its real calendar button');
 }
 // ---- quick palette: the theme accent and the colours of its styles, once each
 {

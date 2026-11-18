@@ -84,6 +84,15 @@ function attribute(n, prompt, type, help) {
     ',p_help_text=>' + q(help) + '\n);\n';
 }
 
+// Changes whenever a file changes, so browsers fetch the new files after an import.
+function filesVersion() {
+  const h = crypto.createHash('sha1');
+  list(FILES).forEach((abs) => h.update(fs.readFileSync(abs)));
+  h.update(installScript());
+  const n = parseInt(h.digest('hex').slice(0, 8), 16) % 1000000000;
+  return n > 0 ? n : 1;
+}
+
 const sql =
 `prompt --application/set_environment
 set define off verify off feedback off
@@ -128,7 +137,7 @@ wwv_flow_imp_shared.create_plugin(
 ,p_help_text=>${q('Flutter Designer and Theme Designer for Oracle APEX pages. On first use it creates its tables and packages in the parsing schema of the application.')}
 ,p_version_identifier=>'${VERSION}'
 ,p_about_url=>'https://github.com/josephaaziz-byte/apex-visual-designer-plugin'
-,p_files_version=>1
+,p_files_version=>${filesVersion()}
 );
 ${attribute(1, 'Designer authorization', 'TEXT', 'Name of an authorization scheme of this application. Users it admits may use the designer. Leave empty to allow only developers signed in to App Builder.')}${attribute(2, 'Default target application', 'INTEGER', 'Application id the designer opens by default. Leave empty for this application. The target must be registered with database/register_target.sql.')}${attribute(3, 'Height (px)', 'INTEGER', 'Height of the designer. Default 800.')}end;
 /

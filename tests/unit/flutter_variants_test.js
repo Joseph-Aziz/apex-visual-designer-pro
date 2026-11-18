@@ -347,3 +347,23 @@ console.log('flutter_variants_test: all passed');
   assert.ok(/padding-block-start:\d+px; padding-block-end/.test(css), 'input room for the label');
   console.log('label inside: ok');
 }
+
+// Field designs offer only the shape settings their CSS reads: a setting in the panel must change
+// the CSS, and a setting a design leaves out must not be needed (no "undefined" or "NaN" in the CSS).
+{
+  const SHAPE = { radius: 7, bg: '#123456', border: '#654321', borderWidth: 3 };
+  ['text', 'date', 'select'].forEach((t) => F.forType(t).forEach((v) => {
+    const offered = v.params.map((p) => p.key);
+    const base = v.css('#X1', F.values(v, {}));
+    assert.ok(!/undefined|NaN/.test(base), t + v.id + ' css has no missing values');
+    Object.keys(SHAPE).forEach((k) => {
+      if (!offered.includes(k)) return;
+      assert.notStrictEqual(v.css('#X1', F.values(v, { [k]: SHAPE[k] })), base, t + v.id + ' ' + k + ' changes the css');
+    });
+  }));
+  const keys = (t, id) => F.get(t, id).params.map((p) => p.key);
+  assert.ok(!keys('text', 'v3').includes('radius'), 'Soft has no corner radius');
+  assert.ok(!keys('text', 'v6').includes('radius'), 'Pill has no corner radius');
+  assert.ok(keys('date', 'v3').includes('radius'), 'date Soft keeps radius for the calendar popup');
+  console.log('unused field settings hidden: ok');
+}

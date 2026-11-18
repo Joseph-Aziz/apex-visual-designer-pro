@@ -206,6 +206,7 @@
       dateNav(sel, v) +
       iconInside(sel, v, '.a-Button--calendar', 'calendar');
   }
+  datePopup.uses = ['radius']; // the calendar popup's corners follow the field radius on every shape
   function chevron(sel, v) {
     var ic = iconOf(v, 'chevron');
     // native <select>: the arrow is a background image, placed on the chosen side in LTR and RTL
@@ -222,10 +223,17 @@
     COLOR('text', 'Text colour', DASH.text), COLOR('border', 'Border colour', DASH.border), COLOR('icon', 'Icon colour', DASH.muted),
     PX('radius', 'Corner radius', 10), PX('borderWidth', 'Border width', 1), PX('padding', 'Padding', 10), PX('fontSize', 'Font size', 14),
     p('fontWeight', 'Font weight', 'weight', 600), LABEL_POS];
+  // Settings a shape's CSS never reads (fieldCss draws them fixed), so the panel does not offer them.
+  // An extra (such as datePopup) lists in .uses the settings it still reads.
+  var FIELD_UNUSED = { outlined: ['bg'], soft: ['radius', 'border', 'borderWidth'], underline: ['bg', 'radius'],
+    glass: ['border'], pill: ['bg', 'radius'] };
   function fieldType(type, extra, icons) {
     return [['v1', 'Filled', 'filled'], ['v2', 'Outlined', 'outlined'], ['v3', 'Soft', 'soft'],
       ['v4', 'Underline', 'underline'], ['v5', 'Glass', 'glass'], ['v6', 'Pill', 'pill']].map(function (d) {
-      return { type: type, id: d[0], label: d[1], params: icons ? fieldParams.concat(icons) : fieldParams, css: fieldCss(d[2], extra), needsJs: false };
+      var keep = (extra && extra.uses) || [];
+      var unused = (FIELD_UNUSED[d[2]] || []).filter(function (k) { return keep.indexOf(k) < 0; });
+      var params = fieldParams.filter(function (prm) { return unused.indexOf(prm.key) < 0; });
+      return { type: type, id: d[0], label: d[1], params: icons ? params.concat(icons) : params, css: fieldCss(d[2], extra), needsJs: false };
     });
   }
 

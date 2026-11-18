@@ -50,6 +50,9 @@ CREATE OR REPLACE PACKAGE PKG_VD_PAGE_WRITER AUTHID CURRENT_USER AS
                         p_fail_after_import IN BOOLEAN DEFAULT FALSE) RETURN VARCHAR2;
   -- Puts back the values before the newest applied change list and forgets it. Returns the new token.
   FUNCTION undo_layout(p_app IN NUMBER, p_page IN NUMBER, p_token IN VARCHAR2) RETURN VARCHAR2;
+  -- Imports the newest backup of a page, kept before each designer write (5 per page).
+  -- For a page lost by a failed write; raises -20232 when there is none.
+  PROCEDURE restore_backup(p_app IN NUMBER, p_page IN NUMBER);
 END PKG_VD_PAGE_WRITER;
 /
 
@@ -177,19 +180,79 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
     RETURN SUBSTR(p_src, 1, l_a - 1) || l_call || p_add || SUBSTR(p_src, l_b);
   END edit_call;
 
-  -- Imports p_new over a page whose export is p_old. A page import removes the page first, so
-  -- when any part of it fails the old export is imported again; the page is never left removed.
-  PROCEDURE replace_page(p_old IN CLOB, p_new IN CLOB, p_fail_after_import IN BOOLEAN DEFAULT FALSE) IS
+  FUNCTION page_exists(p_app IN NUMBER, p_page IN NUMBER) RETURN BOOLEAN IS
+    l_n NUMBER;
   BEGIN
+    EXECUTE IMMEDIATE 'SELECT COUNT(*) FROM APEX_APPLICATION_PAGES WHERE APPLICATION_ID = :a AND PAGE_ID = :p'
+      INTO l_n USING p_app, p_page;
+    RETURN l_n > 0;
+  END page_exists;
+
+  -- Keeps the export of a page before it is replaced, committed on its own so it survives any
+  -- rollback. The last 5 per page are kept; restore_backup imports the newest.
+  PROCEDURE save_backup(p_app IN NUMBER, p_page IN NUMBER, p_src IN CLOB) IS
+    PRAGMA AUTONOMOUS_TRANSACTION;
+    l_ws NUMBER := APEX_APPLICATION.GET_SECURITY_GROUP_ID;
+  BEGIN
+    INSERT INTO VD_PAGE_BACKUPS (WORKSPACE_ID, APP_ID, PAGE_ID, SOURCE, SAVED_BY)
+    VALUES (l_ws, p_app, p_page, p_src,
+            COALESCE(SYS_CONTEXT('APEX$SESSION', 'APP_USER'), SYS_CONTEXT('USERENV', 'SESSION_USER')));
+    DELETE FROM VD_PAGE_BACKUPS
+     WHERE WORKSPACE_ID = l_ws AND APP_ID = p_app AND PAGE_ID = p_page
+       AND BACKUP_ID NOT IN (SELECT BACKUP_ID FROM VD_PAGE_BACKUPS
+                              WHERE WORKSPACE_ID = l_ws AND APP_ID = p_app AND PAGE_ID = p_page
+                              ORDER BY BACKUP_ID DESC FETCH FIRST 5 ROWS ONLY);
+    COMMIT;
+  END save_backup;
+
+  -- Imports p_new over page p_page whose export is p_old. A page import removes the page first,
+  -- so the old export is backed up first, the page is checked after the import, and when any
+  -- part fails the old export is imported again. If even that fails the error says how to
+  -- bring the page back from the backup.
+  PROCEDURE replace_page(p_app IN NUMBER, p_page IN NUMBER, p_old IN CLOB, p_new IN CLOB,
+                         p_fail_after_import IN BOOLEAN DEFAULT FALSE) IS
+    l_err VARCHAR2(4000);
+  BEGIN
+    save_backup(p_app, p_page, p_old);
     import_page(p_new);
+    IF NOT page_exists(p_app, p_page) THEN
+      RAISE_APPLICATION_ERROR(-20234, 'The page was missing after the import.');
+    END IF;
     IF p_fail_after_import OR g_fail_after_import THEN
       RAISE_APPLICATION_ERROR(-20234, 'Test failure after the import.');
     END IF;
   EXCEPTION
     WHEN OTHERS THEN
-      import_page(p_old);
+      l_err := SQLERRM;
+      BEGIN
+        import_page(p_old);
+      EXCEPTION
+        WHEN OTHERS THEN NULL;
+      END;
+      IF NOT page_exists(p_app, p_page) THEN
+        RAISE_APPLICATION_ERROR(-20239, 'Page ' || p_page || ' could not be put back after: ' || l_err ||
+          ' Run PKG_VD_PAGE_WRITER.restore_backup(' || p_app || ', ' || p_page || ') to restore it.');
+      END IF;
       RAISE;
   END replace_page;
+
+  PROCEDURE restore_backup(p_app IN NUMBER, p_page IN NUMBER) IS
+    l_src CLOB;
+  BEGIN
+    PKG_VD_DESIGN_API.assert_target_app(p_app);
+    BEGIN
+      SELECT SOURCE INTO l_src FROM VD_PAGE_BACKUPS
+       WHERE WORKSPACE_ID = APEX_APPLICATION.GET_SECURITY_GROUP_ID AND APP_ID = p_app AND PAGE_ID = p_page
+       ORDER BY BACKUP_ID DESC FETCH FIRST 1 ROW ONLY;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        RAISE_APPLICATION_ERROR(-20232, 'There is no backup of page ' || p_page || '.');
+    END;
+    import_page(l_src);
+    IF NOT page_exists(p_app, p_page) THEN
+      RAISE_APPLICATION_ERROR(-20239, 'The backup of page ' || p_page || ' did not import.');
+    END IF;
+  END restore_backup;
 
   PROCEDURE write_code(p_app IN NUMBER, p_page IN NUMBER, p_css IN CLOB, p_js IN CLOB) IS
     l_owner VARCHAR2(128);
@@ -197,7 +260,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
   BEGIN
     guard(p_app, p_page);
     l_src := export_page(p_app, p_page, l_owner);
-    replace_page(l_src, edit_call(l_src, 'wwv_flow_imp_page.create_page(',
+    replace_page(p_app, p_page, l_src, edit_call(l_src, 'wwv_flow_imp_page.create_page(',
       apex_t_varchar2('p_inline_css', 'p_javascript_code_onload'),
       CHR(10) || ',p_inline_css=>' || literal(p_css) || CHR(10) || ',p_javascript_code_onload=>' || literal(p_js)));
   END write_code;
@@ -279,7 +342,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
       RAISE_APPLICATION_ERROR(-20237, 'Page ' || p_page || ' already uses "' || p_static_id || '". Choose another Static ID.');
     END IF;
     l_src := export_page(p_app, p_page, l_owner);
-    replace_page(l_src, edit_call(l_src,
+    replace_page(p_app, p_page, l_src, edit_call(l_src,
       l_head || CHR(10) || ' p_id=>wwv_flow_imp.id(' || TO_CHAR(p_component_id) || ')',
       apex_t_varchar2(l_arg), CHR(10) || ',' || l_arg || '=>''' || p_static_id || ''''));
   END set_static_id;
@@ -329,7 +392,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
     END;
     l_classes := with_class(l_classes, p_type, p_cls);
     l_src := export_page(p_app, p_page, l_owner);
-    replace_page(l_src, edit_call(l_src,
+    replace_page(p_app, p_page, l_src, edit_call(l_src,
       l_head || CHR(10) || ' p_id=>wwv_flow_imp.id(' || TO_CHAR(p_component_id) || ')',
       apex_t_varchar2(l_arg), CASE WHEN l_classes IS NOT NULL THEN CHR(10) || ',' || l_arg || '=>' || literal(l_classes) END));
   END set_css_class;
@@ -417,7 +480,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
         ',p_plug_source=>' || literal(l_html) || CHR(10) ||
         ');' || SUBSTR(l_src, l_b + 3);
     END IF;
-    replace_page(l_old, l_src);
+    replace_page(p_app, 0, l_old, l_src);
   END write_theme_link;
 
   PROCEDURE apply_theme(p_app IN NUMBER, p_version IN NUMBER, p_css IN CLOB, p_js IN CLOB) IS
@@ -729,7 +792,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
     l_state := JSON_OBJECT_T.parse(PKG_VD_PAGE_CODE.layout_json(p_app, p_page));
     l_old := merge_layout(l_state, l_changes);
     l_src := export_page(p_app, p_page, l_owner);
-    replace_page(l_src, layout_source(l_src, l_changes), p_fail_after_import);
+    replace_page(p_app, p_page, l_src, layout_source(l_src, l_changes), p_fail_after_import);
     RETURN l_old;
   END write_layout;
 

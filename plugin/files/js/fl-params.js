@@ -36,8 +36,8 @@
     var html = V().forType(type).map(function (v) {
       var c = card(type, 'fl-thumb-' + v.id, v, null, member);
       css += c.css;
-      return '<button class="fl-variant' + (current === v.id ? ' is-selected' : '') + '" data-variant="' + v.id + '">' +
-        '<span class="fl-thumb">' + c.html + '</span><b>' + esc(v.label) + '</b><span class="fl-badge">Built-in</span></button>';
+      return '<div class="fl-variant' + (current === v.id ? ' is-selected' : '') + '" role="button" tabindex="0" data-variant="' + v.id + '">' +
+        '<span class="fl-thumb" inert>' + c.html + '</span><b>' + esc(v.label) + '</b><span class="fl-badge">Built-in</span></div>';
     }).join('');
     return { html: html, css: css };
   }
@@ -56,8 +56,8 @@
       if (!v) return '';
       var c = card(type, 'fl-preset-' + i, v, pr.values, opts.member);
       css += c.css;
-      return '<button class="fl-variant' + (chosen && opts.preset === i ? ' is-selected' : '') + '" data-preset="' + i + '">' +
-        '<span class="fl-thumb">' + c.html + '</span><b>' + esc(pr.label) + '</b><span class="fl-badge fl-badge--custom">Custom</span></button>';
+      return '<div class="fl-variant' + (chosen && opts.preset === i ? ' is-selected' : '') + '" role="button" tabindex="0" data-preset="' + i + '">' +
+        '<span class="fl-thumb" inert>' + c.html + '</span><b>' + esc(pr.label) + '</b><span class="fl-badge fl-badge--custom">Custom</span></div>';
     }).join('');
     // Reset is always drawn, hidden while the design has no values, so a setting change can show it in place.
     var actions = '<button type="button" class="vd-btn vd-btn--ghost" data-gallery="reset" title="Keep the design and clear its settings"' + (opts.canReset ? '' : ' hidden') + '>Reset settings</button>' +
@@ -78,11 +78,21 @@
       b.addEventListener('mouseleave', function () { if (over) { over = false; on.tryOn(null); } });
       b.addEventListener('blur', function () { on.tryOn(null); });
     };
+    // A card is a div with role=button: Enter and Space act like a click.
+    var keys = function (b) {
+      b.addEventListener('keydown', function (e) {
+        if (e.target !== b || (e.key !== 'Enter' && e.key !== ' ')) return;
+        e.preventDefault();
+        b.click();
+      });
+    };
     root.querySelectorAll('[data-variant]').forEach(function (b) {
+      keys(b);
       b.addEventListener('click', function () { if (on.pick) on.pick(b.getAttribute('data-variant')); });
       tryOn(b, { variant: b.getAttribute('data-variant') });
     });
     root.querySelectorAll('[data-preset]').forEach(function (b) {
+      keys(b);
       b.addEventListener('click', function () { if (on.preset) on.preset(Number(b.getAttribute('data-preset'))); });
       tryOn(b, { preset: Number(b.getAttribute('data-preset')) });
     });

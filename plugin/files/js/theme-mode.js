@@ -112,10 +112,10 @@
       var list = styles(state.theme, type);
       var cards = list.map(function (s, i) {
         var tag = s.isDefault ? 'default · and vd-' + type + '-' + s.cls : 'vd-' + type + '-' + s.cls;
-        return '<button class="th-sample' + (state.type === type && state.index === i ? ' is-selected' : '') + '" data-type="' + type + '" data-index="' + i + '">' +
-          '<span class="th-sample-box">' + sample(type, s.isDefault ? null : s.cls) + '</span><b>' + esc(s.name) + '</b><code>' + esc(tag) + '</code></button>';
+        return '<div role="button" tabindex="0" class="th-sample' + (state.type === type && state.index === i ? ' is-selected' : '') + '" data-type="' + type + '" data-index="' + i + '">' +
+          '<span class="th-sample-box" inert>' + sample(type, s.isDefault ? null : s.cls) + '</span><b>' + esc(s.name) + '</b><code>' + esc(tag) + '</code></div>';
       }).join('');
-      var plain = '<div class="th-sample is-plain"><span class="th-sample-box">' + sample(type, null) + '</span><b>No style</b><code>APEX look</code></div>';
+      var plain = '<div class="th-sample is-plain"><span class="th-sample-box" inert>' + sample(type, null) + '</span><b>No style</b><code>APEX look</code></div>';
       return '<h3>' + esc(T().names[type]) + '</h3><div class="th-grid">' + (list.some(function (s) { return s.isDefault; }) ? '' : plain) + cards + '</div>';
     }).join('');
   }
@@ -135,6 +135,12 @@
         g.innerHTML = galleryHtml();
         g.querySelectorAll('[data-type]').forEach(function (b) {
           b.addEventListener('click', function () { select(b.getAttribute('data-type'), Number(b.getAttribute('data-index'))); });
+          // The sample is a div with role=button: Enter and Space act like a click.
+          b.addEventListener('keydown', function (e) {
+            if (e.target !== b || (e.key !== 'Enter' && e.key !== ' ')) return;
+            e.preventDefault();
+            b.click();
+          });
         });
       }
       host.querySelector('#th-gallery-css').textContent = galleryCss();
@@ -492,7 +498,7 @@
           if (v) {
             var c = VD.flParams.card(g.family.id, 'sv-thumb-' + g.family.id + '-' + esc(st.cls), v, st.values);
             css += c.css;
-            thumb = '<span class="fl-thumb sv-thumb" aria-hidden="true">' + c.html + '</span>';
+            thumb = '<span class="fl-thumb sv-thumb" aria-hidden="true" inert>' + c.html + '</span>';
           }
           return '<li class="sv-card">' + thumb + '<b>' + esc(st.name) + '</b><span>' + esc(v ? v.label : 'unknown design ' + st.variant) +
             ' · vd-' + esc(g.family.id) + '-' + esc(st.cls) + (st.isDefault ? ' · default' : '') + '</span></li>';

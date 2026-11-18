@@ -130,6 +130,10 @@ BEGIN
   ok('undo puts the sequence back', region_seq(l_r1) = l_seq);
   SELECT COUNT(*) - l_n INTO l_n FROM &&VD_SCHEMA..VD_LAYOUT_VERSIONS WHERE app_id = &&TEST_APP AND page_id = &&SCRATCH_PAGE;
   ok('undo forgets the version', l_n = -1);
+  SELECT COUNT(*) INTO l_n FROM &&VD_SCHEMA..VD_PAGE_BACKUPS WHERE app_id = &&TEST_APP AND page_id = &&SCRATCH_PAGE;
+  ok('each write keeps a page backup', l_n >= 1);
+  &&VD_SCHEMA..PKG_VD_PAGE_WRITER.restore_backup(&&TEST_APP, &&SCRATCH_PAGE);
+  ok('restore_backup brings the page back', region_seq(l_r1) IS NOT NULL);
 
   DBMS_OUTPUT.PUT_LINE(l_pass || ' passed, ' || l_fail || ' failed');
 END;
