@@ -212,6 +212,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
   PROCEDURE replace_page(p_app IN NUMBER, p_page IN NUMBER, p_old IN CLOB, p_new IN CLOB,
                          p_fail_after_import IN BOOLEAN DEFAULT FALSE) IS
     l_err VARCHAR2(4000);
+    l_restored BOOLEAN := TRUE;
   BEGIN
     save_backup(p_app, p_page, p_old);
     import_page(p_new);
@@ -227,9 +228,9 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
       BEGIN
         import_page(p_old);
       EXCEPTION
-        WHEN OTHERS THEN NULL;
+        WHEN OTHERS THEN l_restored := FALSE; -- the page may be missing or only partly back
       END;
-      IF NOT page_exists(p_app, p_page) THEN
+      IF NOT l_restored OR NOT page_exists(p_app, p_page) THEN
         RAISE_APPLICATION_ERROR(-20239, 'Page ' || p_page || ' could not be put back after: ' || l_err ||
           ' Run PKG_VD_PAGE_WRITER.restore_backup(' || p_app || ', ' || p_page || ') to restore it.');
       END IF;
@@ -239,7 +240,7 @@ CREATE OR REPLACE PACKAGE BODY PKG_VD_PAGE_WRITER AS
   PROCEDURE restore_backup(p_app IN NUMBER, p_page IN NUMBER) IS
     l_src CLOB;
   BEGIN
-    PKG_VD_DESIGN_API.assert_target_app(p_app);
+    guard(p_app, p_page);
     BEGIN
       SELECT SOURCE INTO l_src FROM VD_PAGE_BACKUPS
        WHERE WORKSPACE_ID = APEX_APPLICATION.GET_SECURITY_GROUP_ID AND APP_ID = p_app AND PAGE_ID = p_page
