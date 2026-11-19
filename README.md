@@ -13,9 +13,16 @@ another application in the same workspace), and work in four workspaces:
     20 chart types (column, bar, line, area, pie, donut, scatter, bubble, radar, funnel, gauge, heatmap and more),
     set the colours, legend, tooltip, axes and labels, start from a ready-made template, and preview the chart on
     desktop or mobile.
+
+    ![Chart Designer restyling an area chart](docs/images/chart-designer.png)
+
 - **Theme:** set one look for the whole application and push it as a single theme file.
 - **Layout:** move a page's regions and items on the 12-column grid and apply the new layout in one step, with undo.
 - **Library:** keep favourite designs as named presets and reuse them on every page.
+
+- Live demo: [open the demo](https://oracleapex.com/ords/f?p=138730:9999) and press **Use demo account**, then **Sign In**.
+
+  ![Signing in to the demo with Use demo account](docs/images/demo-sign-in.gif)
 
 - Install: import the plug-in, add the region, done. Details: [docs/INSTALL.md](docs/INSTALL.md)
 - Using it: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
